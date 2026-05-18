@@ -35,6 +35,15 @@ a { color: #36c; }
 .const-row input { width: 64px; font-family: monospace; font-size: 13px; text-align: center; padding: 2px 4px; border: 1px solid #bbb; border-radius: 3px; }
 .const-hint { font-size: 11px; color: #888; margin-top: 6px; }
 
+#config-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; min-width: 180px; flex: 1; }
+#config-panel h3 { font-size: 12px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+#config-code { width: 100%; font-family: monospace; font-size: 11px; background: #f8f8f8;
+  border: 1px solid #ddd; border-radius: 3px; padding: 4px 6px; resize: vertical;
+  min-height: 68px; word-break: break-all; white-space: pre-wrap; }
+#config-code.ok  { border-color: #8c8; background: #f0fff0; }
+#config-code.err { border-color: #e88; background: #fff4f4; }
+#config-status { font-size: 10px; color: #888; margin-top: 3px; min-height: 14px; }
+
 #gen-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 #gen-btn { padding: 6px 18px; font-family: monospace; font-size: 14px; font-weight: bold;
   background: #26a; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
@@ -139,6 +148,12 @@ a { color: #36c; }
     </div>
     <div class="const-hint">Adds k to ρ(x, X) for every alternative x.<br>Uses the identity Σ<sub>x</sub> ρ(x, X) = 1.</div>
   </div>
+
+  <div id="config-panel">
+    <h3>Config Code</h3>
+    <textarea id="config-code" spellcheck="false"></textarea>
+    <div id="config-status"></div>
+  </div>
 </div>
 
 <div id="gen-row">
@@ -234,6 +249,7 @@ function renderDiagram() {
         inp.id = `inp-${mask}-${li}`;
         inp.addEventListener('input', () => {
           inp.classList.toggle('nonzero', inp.value !== '' && inp.value !== '0');
+          updateConfigCode();
         });
         const lbl = document.createElement('div');
         lbl.className = 'letter-label';
@@ -256,6 +272,7 @@ function clearAllInputs() {
   });
   document.getElementById('const-k').value = '0';
   document.getElementById('output-panel').style.display = 'none';
+  updateConfigCode();
 }
 
 // ── Mode info & cores-panel visibility ────────────────────────────────────────
@@ -301,6 +318,77 @@ function getTarget() {
 
 function getTargetVal(target, mask, x) {
   return (target[mask] && target[mask][x] !== undefined) ? target[mask][x] : 0;
+}
+
+// ── Config code encode / decode ───────────────────────────────────────────────
+// Format: N|std|rep|cores|k[|mask:li:val]*
+// (all values are integers; li is 0-indexed alternative index)
+
+function encodeConfig() {
+  const std   = document.getElementById('opt-standard').checked   ? 1 : 0;
+  const rep   = document.getElementById('opt-repeatable').checked ? 1 : 0;
+  const cores = parseInt(document.getElementById('cores-input').value) || 1;
+  const k     = parseInt(document.getElementById('const-k').value)    || 0;
+  const parts = [N, std, rep, cores, k];
+  document.querySelectorAll('.coeff-input').forEach(inp => {
+    const val = parseInt(inp.value);
+    if (!isNaN(val) && val !== 0)
+      parts.push(inp.dataset.mask + ':' + inp.dataset.li + ':' + val);
+  });
+  return parts.join('|');
+}
+
+function applyConfig(code) {
+  try {
+    const parts = code.trim().split('|');
+    if (parts.length < 5) return false;
+    const n     = parseInt(parts[0]);
+    const std   = parseInt(parts[1]);
+    const rep   = parseInt(parts[2]);
+    const cores = parseInt(parts[3]);
+    const k     = parseInt(parts[4]);
+    if ([n,std,rep,cores,k].some(isNaN) || n < 2 || n > 9) return false;
+    const entries = [];
+    for (let i = 5; i < parts.length; i++) {
+      const m = parts[i].match(/^(\d+):(\d+):(-?\d+)$/);
+      if (!m) return false;
+      entries.push({ mask: +m[1], li: +m[2], val: +m[3] });
+    }
+    // Validate all masks fit inside N
+    for (const e of entries) if (e.mask >= (1 << n) || e.li >= n) return false;
+
+    if (n !== N) {
+      N = n;
+      document.getElementById('n-select').value = n;
+      updateAlts();
+      renderDiagram(); // redraws inputs; also calls updateModeInfo + updateConfigCode
+    }
+    document.getElementById('opt-standard').checked   = std   === 1;
+    document.getElementById('opt-repeatable').checked = rep   === 1;
+    document.getElementById('cores-input').value = cores;
+    document.getElementById('const-k').value     = k;
+    updateModeInfo();
+    document.querySelectorAll('.coeff-input').forEach(inp => {
+      inp.value = ''; inp.classList.remove('nonzero');
+    });
+    for (const { mask, li, val } of entries) {
+      const inp = document.getElementById('inp-' + mask + '-' + li);
+      if (inp) { inp.value = val; inp.classList.toggle('nonzero', val !== 0); }
+    }
+    document.getElementById('output-panel').style.display = 'none';
+    return true;
+  } catch { return false; }
+}
+
+let _configUpdating = false;
+
+function updateConfigCode() {
+  if (_configUpdating) return;
+  const ta = document.getElementById('config-code');
+  if (document.activeElement === ta) return; // don't overwrite while user is editing
+  ta.value = encodeConfig();
+  ta.classList.remove('ok', 'err');
+  document.getElementById('config-status').textContent = '';
 }
 
 // ── MATLAB code generation ────────────────────────────────────────────────────
@@ -621,17 +709,40 @@ function copyCode() {
 document.getElementById('n-select').addEventListener('change', function () {
   N = +this.value;
   updateAlts();
-  renderDiagram();
+  renderDiagram(); // also calls updateConfigCode via updateModeInfo path
   document.getElementById('output-panel').style.display = 'none';
+  updateConfigCode();
 });
 
 ['opt-repeatable', 'opt-standard'].forEach(id =>
-  document.getElementById(id).addEventListener('change', updateModeInfo)
+  document.getElementById(id).addEventListener('change', () => { updateModeInfo(); updateConfigCode(); })
 );
+
+document.getElementById('cores-input').addEventListener('input', updateConfigCode);
+document.getElementById('const-k').addEventListener('input', updateConfigCode);
+
+// Config code: parse on input, update on blur
+document.getElementById('config-code').addEventListener('input', function () {
+  _configUpdating = true;
+  const ta  = this;
+  const st  = document.getElementById('config-status');
+  const ok  = applyConfig(ta.value);
+  ta.classList.toggle('ok',  ok);
+  ta.classList.toggle('err', !ok && ta.value.trim() !== '');
+  st.textContent = ok ? '✓ applied' : (ta.value.trim() ? '✗ invalid' : '');
+  _configUpdating = false;
+});
+
+document.getElementById('config-code').addEventListener('blur', function () {
+  this.classList.remove('ok', 'err');
+  document.getElementById('config-status').textContent = '';
+  updateConfigCode(); // refresh to canonical form
+});
 
 N = +document.getElementById('n-select').value;
 updateAlts();
 renderDiagram();
+updateConfigCode();
 </script>
 </body>
 </html>
