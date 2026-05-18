@@ -35,6 +35,9 @@ a { color: #36c; }
   background: #2a6; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 #solve-btn:hover { background: #1a5; }
 #solve-btn:active { background: #0a4; }
+#stop-btn { padding: 6px 14px; font-family: monospace; font-size: 14px; font-weight: bold;
+  background: #c33; color: #fff; border: none; border-radius: 4px; cursor: pointer; display: none; }
+#stop-btn:hover { background: #a22; }
 #runtime-est { font-size: 12px; color: #888; }
 
 /* Hasse diagram */
@@ -131,6 +134,7 @@ a { color: #36c; }
 
 <div id="solve-row">
   <button id="solve-btn" onclick="solve()">Solve Now</button>
+  <button id="stop-btn" onclick="stopSolve()">Stop</button>
   <span id="runtime-est"></span>
 </div>
 
@@ -250,9 +254,9 @@ function updateRuntimeEst() {
     const ms = Math.round(0.05 * Math.pow(3, N));
     est = ms < 1 ? '< 1 ms' : `~${ms} ms`;
   } else {
-    if (N <= 5) est = '< 1 s';
-    else if (N === 6) est = '< 1 min (may be slow)';
-    else est = 'potentially very long — not recommended for N ≥ 7';
+    if (N <= 5) est = 'seconds (use Stop to cancel)';
+    else if (N === 6) est = 'minutes (use Stop to cancel)';
+    else est = 'very long — use Stop when ready';
   }
   document.getElementById('runtime-est').textContent = `Estimated runtime: ${est}`;
 }
@@ -461,9 +465,18 @@ function findSecondSolution(solution1, target, allowRepeatable) {
   return null;
 }
 
+// ── Stop control ─────────────────────────────────────────────────────────────
+
+let solveStopFlag = false;
+
+function stopSolve() {
+  solveStopFlag = true;
+}
+
 // ── Backtracking solver: General BM, Allow Repeatable = No ───────────────────
 // Enumerates all valid (x,S,T) actions and searches for a {0,1} subset
-// whose BM expansion matches the target. Uses a timeout of 8 seconds.
+// whose BM expansion matches the target. Runs until a solution is found,
+// the user clicks Stop, or all candidates are exhausted.
 
 function solveBacktrack(target, onlyStandard) {
   const X = (1 << N) - 1;
@@ -477,7 +490,6 @@ function solveBacktrack(target, onlyStandard) {
           if ((T & S) === S) Tlist.push(T);
       }
       for (const T of Tlist) {
-        // Pre-compute this action's contribution
         const contrib = {};
         for (let mask = 1; mask < (1 << N); mask++) {
           if (!(mask & (1 << x))) continue;
@@ -492,7 +504,6 @@ function solveBacktrack(target, onlyStandard) {
     }
   }
 
-  // Residual: how much is still needed (start from target)
   const resid = {};
   for (let mask = 1; mask < (1 << N); mask++) {
     for (let x = 0; x < N; x++) {
@@ -504,8 +515,6 @@ function solveBacktrack(target, onlyStandard) {
 
   const chosen = [];
   let found = null;
-  const TIMEOUT = 8000;
-  const start = Date.now();
 
   function residZero() {
     for (const row of Object.values(resid))
@@ -518,32 +527,22 @@ function solveBacktrack(target, onlyStandard) {
       const mask = +maskStr;
       if (!resid[mask]) resid[mask] = {};
       for (const [xStr, delta] of Object.entries(row)) {
-        const x = +xStr;
-        resid[mask][x] = (resid[mask][x] || 0) - sign * delta;
+        resid[mask][+xStr] = (resid[mask][+xStr] || 0) - sign * delta;
       }
     }
   }
 
-  // Quick pruning: check if residual can still reach 0
-  function canPrune(idx) {
-    // Check each constrained cell: if residual > remaining candidates that cover it,
-    // prune. (Simple bound; not tight but catches obvious cases.)
-    return false; // Disabled for now for simplicity
-  }
-
   function bt(idx) {
-    if (found || Date.now() - start > TIMEOUT) return;
+    if (found || solveStopFlag) return;
     if (residZero()) { found = [...chosen]; return; }
     if (idx >= candidates.length) return;
 
-    // Try including candidates[idx]
     applyContrib(candidates[idx].contrib, 1);
     chosen.push(idx);
     bt(idx + 1);
     chosen.pop();
     applyContrib(candidates[idx].contrib, -1);
 
-    // Try skipping
     if (!found) bt(idx + 1);
   }
 
@@ -579,7 +578,7 @@ function actionsToSaveCode(actions) {
   const parts = [String(N)];
   for (const { x, S, T, count } of actions) {
     for (let i = 0; i < count; i++)
-      parts.push(`${x}:${S.toString(16)}-${T.toString(16)}`);
+      parts.push(`${alts[x]}:${S.toString(16)}-${T.toString(16)}`);
   }
   return parts.join('|');
 }
@@ -613,6 +612,7 @@ function renderSol(title, cls, actions, note) {
 // ── Main solve ────────────────────────────────────────────────────────────────
 
 function solve() {
+  solveStopFlag = false;
   const target = getTarget();
   const optRep  = document.getElementById('opt-repeatable').checked;
   const optStd  = document.getElementById('opt-standard').checked;
@@ -620,8 +620,12 @@ function solve() {
 
   const panel = document.getElementById('output-panel');
   const content = document.getElementById('output-content');
+  const solveBtn = document.getElementById('solve-btn');
+  const stopBtn  = document.getElementById('stop-btn');
   panel.style.display = '';
   content.innerHTML = '<p style="color:#888">Solving…</p>';
+  solveBtn.style.display = 'none';
+  stopBtn.style.display = '';
 
   setTimeout(() => {
     try {
@@ -629,6 +633,10 @@ function solve() {
     } catch (e) {
       content.innerHTML = `<p class="no-sol">Error: ${e.message}</p>`;
       console.error(e);
+    } finally {
+      solveBtn.style.display = '';
+      stopBtn.style.display = 'none';
+      solveStopFlag = false;
     }
   }, 16);
 }
@@ -661,12 +669,11 @@ function doSolve(target, allowRepeatable, onlyStandard, checkUnique) {
     } else {
       const negEntries = actions.filter(a => a.count < 0 || (!allowRepeatable && a.count > 1));
       html += `<div class="sol-block invalid"><div class="sol-title">No valid Standard BM solution</div>`;
-      html += `<p class="sol-err">The unique Standard BM decomposition has ${negEntries.length} action(s) with invalid coefficient(s) ` +
-        (allowRepeatable ? '(negative count).' : '(count &gt; 1 or negative).') + `</p>`;
-      html += `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12px;color:#666;">Show raw decomposition</summary>`;
-      html += renderSol('Raw Standard BM (invalid)', 'warn', actions,
-        'Negative coefficients mean this polynomial cannot be expressed as a positive combination of Standard BM actions.');
-      html += '</details></div>';
+      html += `<p class="sol-err">The unique Standard BM decomposition has ${negEntries.length} action(s) with ` +
+        (allowRepeatable ? 'negative count.' : 'count outside {0,1}.') + `</p>`;
+      html += `<p class="sol-note">This polynomial cannot be expressed as a ` +
+        (allowRepeatable ? 'non-negative' : '{0,1}') +
+        ` combination of Standard BM actions. Try unchecking "Only Standard BM".</p></div>`;
     }
 
     if (checkUnique) {
@@ -703,9 +710,8 @@ function doSolve(target, allowRepeatable, onlyStandard, checkUnique) {
       );
     } else if (!allowRepeatable) {
       // Try backtracking (slow for large N)
-      const warnN = N >= 7;
-      if (warnN) {
-        html += `<p class="unique-note" style="color:#c80;">N = ${N}: backtracking search for {0,1} solution may be very slow or time out (8 s limit).</p>`;
+      if (N >= 7) {
+        html += `<p class="unique-note" style="color:#c80;">N = ${N}: backtracking search may be very slow. Click Stop to cancel.</p>`;
       }
       const btActions = solveBacktrack(target, false);
       if (btActions) {
@@ -713,23 +719,18 @@ function doSolve(target, allowRepeatable, onlyStandard, checkUnique) {
         html += renderSol('Solution 1 (General BM — backtracking)', 'valid', btActions,
           'Found via exhaustive search. May not be unique.');
       } else {
+        const stopped = solveStopFlag;
         html += `<div class="sol-block invalid"><div class="sol-title">No solution found</div>`;
-        html += `<p class="sol-err">Could not find a {0,1} combination of BM actions matching the target within the time limit.</p></div>`;
-        // Show Standard BM for reference
-        html += `<details><summary style="cursor:pointer;font-size:12px;color:#666;margin-top:6px;">Show Standard BM decomposition (may have invalid counts)</summary>`;
-        html += renderSol('Standard BM (reference)', 'warn', stdActions,
-          'This decomposition has counts outside {0,1}. Try enabling Allow Repeatable.');
-        html += '</details>';
+        html += `<p class="sol-err">${stopped
+          ? 'Search stopped by user before a solution was found.'
+          : 'No {0,1} combination of BM actions matches this target.'}</p>`;
+        html += `<p class="sol-note">Try enabling "Allow Repeatable BM" to allow counts &gt; 1.</p></div>`;
       }
     } else {
       // Allow Repeatable = Yes but no non-negative solution found
       html += `<div class="sol-block invalid"><div class="sol-title">No non-negative solution found</div>`;
-      html += `<p class="sol-err">The target polynomial cannot be expressed as a non-negative combination of BM actions.</p>`;
-      html += `<p class="sol-note">Standard BM has negative coefficients; diagonal (T=S) also fails (target has negative entries).</p></div>`;
-      html += `<details><summary style="cursor:pointer;font-size:12px;color:#666;margin-top:6px;">Show Standard BM decomposition (reference)</summary>`;
-      html += renderSol('Standard BM (reference)', 'warn', stdActions,
-        'Negative coefficients indicate the polynomial has no valid BM expression with non-negative counts.');
-      html += '</details>';
+      html += `<p class="sol-err">This polynomial cannot be expressed as a non-negative combination of BM actions.</p>`;
+      html += `<p class="sol-note">The Standard BM decomposition has negative coefficients, and the target has negative entries so the diagonal approach also fails.</p></div>`;
     }
   }
 
