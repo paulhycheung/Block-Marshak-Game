@@ -124,7 +124,8 @@ a { color: #36c; }
     </div>
     <div class="cores-hint">
       Workers for MATLAB <code>parpool</code>.<br>
-      Enables <code>UseParallel</code> in <code>intlinprog</code>.<br>
+      <code>intlinprog</code> auto-uses an open pool for<br>
+      parallel LP relaxations in branch-and-bound.<br>
       Requires <em>Parallel Computing Toolbox</em>.<br>
       Not used in Standard BM mode (runs in &lt;1 ms).
     </div>
@@ -504,7 +505,8 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
     lines.push('');
     lines.push("options = optimoptions('intlinprog', 'Display', 'iter');");
     if (numCores > 1) {
-      lines.push('options.UseParallel = true; % distribute branch-and-bound across workers');
+      lines.push('% intlinprog automatically uses the open parallel pool for LP relaxations');
+      lines.push('% in branch-and-bound — no UseParallel option needed.');
     }
     lines.push('');
     lines.push("fprintf('Running intlinprog...\\n');");
