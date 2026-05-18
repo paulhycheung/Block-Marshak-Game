@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Block-Marshak MATLAB Solver Export</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: monospace; background: #f0f0f0; padding: 14px; font-size: 13px; }
+h2 { margin-bottom: 6px; font-size: 18px; }
+a { color: #36c; }
+
+#top-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+#top-bar label { display: flex; align-items: center; gap: 5px; }
+#top-bar select { font-family: monospace; font-size: 13px; padding: 2px 4px; }
+
+#panels { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+
+#options-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; min-width: 260px; }
+#options-panel h3 { font-size: 12px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+.opt-row { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 7px; line-height: 1.4; }
+.opt-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+.opt-row label { font-size: 12px; cursor: pointer; }
+.opt-hint { font-size: 11px; color: #888; margin-left: 20px; margin-top: -4px; margin-bottom: 6px; }
+
+#cores-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; transition: opacity .2s; }
+#cores-panel h3 { font-size: 12px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+#cores-panel.disabled { opacity: 0.45; pointer-events: none; }
+.cores-row { display: flex; align-items: center; gap: 8px; }
+.cores-row input { width: 64px; font-family: monospace; font-size: 13px; text-align: center; padding: 2px 4px; border: 1px solid #bbb; border-radius: 3px; }
+.cores-hint { font-size: 11px; color: #888; margin-top: 6px; line-height: 1.5; }
+
+#const-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; }
+#const-panel h3 { font-size: 12px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+.const-row { display: flex; align-items: center; gap: 8px; }
+.const-row input { width: 64px; font-family: monospace; font-size: 13px; text-align: center; padding: 2px 4px; border: 1px solid #bbb; border-radius: 3px; }
+.const-hint { font-size: 11px; color: #888; margin-top: 6px; }
+
+#gen-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+#gen-btn { padding: 6px 18px; font-family: monospace; font-size: 14px; font-weight: bold;
+  background: #26a; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+#gen-btn:hover { background: #15a; }
+#gen-btn:active { background: #048; }
+#mode-info { font-size: 12px; color: #888; }
+
+#hasse-wrap { background: #fff; border: 1px solid #ccc; border-radius: 5px;
+  padding: 10px; margin-bottom: 12px; overflow-x: auto; }
+#hasse-wrap h3 { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+#hasse { display: flex; flex-direction: column; gap: 8px; }
+.hasse-layer { display: flex; gap: 6px; justify-content: center; flex-wrap: nowrap; min-width: max-content; }
+.subset-box { border: 2px solid #aaa; border-radius: 4px; padding: 4px 5px;
+  background: #fafafa; display: inline-flex; flex-direction: column; align-items: stretch; }
+.letter-cols { display: flex; gap: 3px; }
+.letter-col { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.coeff-input { width: 34px; height: 20px; font-family: monospace; font-size: 11px;
+  text-align: center; border: 1px solid #bbb; border-radius: 2px; background: #f9f9f9; padding: 0 2px; }
+.coeff-input:focus { outline: none; border-color: #5af; background: #edf8ff; }
+.coeff-input.nonzero { background: #efffef; border-color: #8c8; font-weight: bold; }
+.letter-label { font-size: 13px; color: #333; padding: 0 3px; }
+#clear-btn { font-size: 12px; color: #999; border: none; background: none; cursor: pointer; padding: 2px 6px; }
+#clear-btn:hover { color: #c33; }
+
+#output-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; }
+.output-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.output-header h3 { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+#copy-btn { padding: 4px 14px; font-family: monospace; font-size: 12px;
+  background: #555; color: #fff; border: none; border-radius: 3px; cursor: pointer; }
+#copy-btn:hover { background: #333; }
+#copy-btn.copied { background: #2a6; }
+#matlab-output { width: 100%; font-family: monospace; font-size: 12px; background: #f5f5f5;
+  border: 1px solid #ddd; border-radius: 3px; padding: 8px;
+  white-space: pre; overflow: auto; min-height: 320px; resize: vertical;
+  tab-size: 4; }
+.output-note { font-size: 11px; color: #888; margin-top: 6px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h2>Block-Marshak MATLAB Solver Export</h2>
+<p style="margin-bottom:6px; font-size:12px;">
+  <a href="index.html">← Main App</a> &nbsp;|&nbsp; <a href="solver.html">Online Solver</a>
+</p>
+<p style="margin-bottom:12px; font-size:12px; color:#555; max-width:720px;">
+  Enter your target polynomial ρ(x, S) below, choose options, then click
+  <strong>Generate MATLAB Code</strong>. Paste the output into a <code>.m</code> file
+  and run it in MATLAB. The script will print the <strong>LaTeX sum-of-q formula</strong>
+  and the <strong>save code</strong> you can paste into the main game.
+</p>
+
+<div id="top-bar">
+  <label>N = <select id="n-select">
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5" selected>5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+  </select></label>
+  <span id="alt-display" style="font-size:12px; color:#666;"></span>
+  <button id="clear-btn" onclick="clearAllInputs()">Clear all</button>
+</div>
+
+<div id="panels">
+  <div id="options-panel">
+    <h3>Options</h3>
+    <div class="opt-row">
+      <input type="checkbox" id="opt-repeatable" checked>
+      <label for="opt-repeatable">Allow Repeatable BM</label>
+    </div>
+    <div class="opt-hint">Unchecked → each q used at most once (binary 0/1 variables)</div>
+    <div class="opt-row">
+      <input type="checkbox" id="opt-standard" checked>
+      <label for="opt-standard">Only Standard BM</label>
+    </div>
+    <div class="opt-hint">Checked → T is always the full set X (fast, unique, no toolbox needed)</div>
+  </div>
+
+  <div id="cores-panel">
+    <h3>Parallel Processing</h3>
+    <div class="cores-row">
+      <span>Cores =</span>
+      <input type="number" id="cores-input" value="1" min="1" max="256">
+    </div>
+    <div class="cores-hint">
+      Workers for MATLAB <code>parpool</code>.<br>
+      Enables <code>UseParallel</code> in <code>intlinprog</code>.<br>
+      Requires <em>Parallel Computing Toolbox</em>.<br>
+      Not used in Standard BM mode (runs in &lt;1 ms).
+    </div>
+  </div>
+
+  <div id="const-panel">
+    <h3>Constant Term</h3>
+    <div class="const-row">
+      <span>k =</span>
+      <input type="number" id="const-k" value="0">
+    </div>
+    <div class="const-hint">Adds k to ρ(x, X) for every alternative x.<br>Uses the identity Σ<sub>x</sub> ρ(x, X) = 1.</div>
+  </div>
+</div>
+
+<div id="gen-row">
+  <button id="gen-btn" onclick="generate()">Generate MATLAB Code</button>
+  <span id="mode-info"></span>
+</div>
+
+<div id="hasse-wrap">
+  <h3>Target Expression &mdash; enter ρ(x, S) coefficients below each letter</h3>
+  <div id="hasse"></div>
+</div>
+
+<div id="output-panel" style="display:none;">
+  <div class="output-header">
+    <h3>MATLAB Code (.m) &mdash; click Copy, paste into a new .m file, run in MATLAB</h3>
+    <button id="copy-btn" onclick="copyCode()">Copy</button>
+  </div>
+  <textarea id="matlab-output" readonly spellcheck="false"></textarea>
+  <p class="output-note">
+    <strong>Toolbox requirements:</strong>
+    Standard BM mode — none.
+    General BM modes — <em>Optimization Toolbox</em> (for <code>intlinprog</code>).
+    Parallel processing — additionally <em>Parallel Computing Toolbox</em> (for <code>parpool</code>).
+    Tested against MATLAB R2016b+.
+  </p>
+</div>
+
+<script>
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function popcount(n) {
+  let c = 0; while (n) { c += n & 1; n >>>= 1; } return c;
+}
+
+function maskLetterIndices(mask) {
+  const r = []; for (let i = 0; mask; i++, mask >>= 1) if (mask & 1) r.push(i); return r;
+}
+
+function maskToStr(mask) {
+  return maskLetterIndices(mask).map(i => alts[i]).join('');
+}
+
+// ── State ──────────────────────────────────────────────────────────────────────
+
+let N = 5;
+let alts = [];
+
+function updateAlts() {
+  alts = 'abcdefghi'.slice(0, N).split('');
+  document.getElementById('alt-display').textContent = `Alternatives: {${alts.join(', ')}}`;
+}
+
+// ── Lex-ordered layers ────────────────────────────────────────────────────────
+
+function layeredMasks() {
+  const layers = [];
+  for (let size = N; size >= 1; size--) {
+    const row = [];
+    for (let m = 1; m < (1 << N); m++) if (popcount(m) === size) row.push(m);
+    row.sort((a, b) => {
+      const ia = maskLetterIndices(a), ib = maskLetterIndices(b);
+      for (let i = 0; i < ia.length; i++) if (ia[i] !== ib[i]) return ia[i] - ib[i];
+      return 0;
+    });
+    layers.push(row);
+  }
+  return layers;
+}
+
+// ── Render diagram ────────────────────────────────────────────────────────────
+
+function renderDiagram() {
+  const hasse = document.getElementById('hasse');
+  hasse.innerHTML = '';
+  const layers = layeredMasks();
+  for (const layer of layers) {
+    const layerDiv = document.createElement('div');
+    layerDiv.className = 'hasse-layer';
+    for (const mask of layer) {
+      const box = document.createElement('div');
+      box.className = 'subset-box';
+      const cols = document.createElement('div');
+      cols.className = 'letter-cols';
+      for (const li of maskLetterIndices(mask)) {
+        const col = document.createElement('div');
+        col.className = 'letter-col';
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.className = 'coeff-input';
+        inp.placeholder = '0';
+        inp.dataset.mask = mask;
+        inp.dataset.li = li;
+        inp.id = `inp-${mask}-${li}`;
+        inp.addEventListener('input', () => {
+          inp.classList.toggle('nonzero', inp.value !== '' && inp.value !== '0');
+        });
+        const lbl = document.createElement('div');
+        lbl.className = 'letter-label';
+        lbl.textContent = alts[li];
+        col.appendChild(inp);
+        col.appendChild(lbl);
+        cols.appendChild(col);
+      }
+      box.appendChild(cols);
+      layerDiv.appendChild(box);
+    }
+    hasse.appendChild(layerDiv);
+  }
+  updateModeInfo();
+}
+
+function clearAllInputs() {
+  document.querySelectorAll('.coeff-input').forEach(inp => {
+    inp.value = ''; inp.classList.remove('nonzero');
+  });
+  document.getElementById('const-k').value = '0';
+  document.getElementById('output-panel').style.display = 'none';
+}
+
+// ── Mode info & cores-panel visibility ────────────────────────────────────────
+
+function updateModeInfo() {
+  const optStd = document.getElementById('opt-standard').checked;
+  const optRep = document.getElementById('opt-repeatable').checked;
+  const coresPanel = document.getElementById('cores-panel');
+  let info;
+  if (optStd) {
+    info = 'Mode: Standard BM — forward substitution, always unique, no toolbox needed';
+    coresPanel.classList.add('disabled');
+  } else if (optRep) {
+    info = 'Mode: General BM, repeatable — non-negative integer LP (Optimization Toolbox required)';
+    coresPanel.classList.remove('disabled');
+  } else {
+    info = 'Mode: General BM, non-repeatable — binary ILP (Optimization Toolbox required)';
+    coresPanel.classList.remove('disabled');
+  }
+  document.getElementById('mode-info').textContent = info;
+}
+
+// ── Read target ───────────────────────────────────────────────────────────────
+
+function getTarget() {
+  const target = {};
+  document.querySelectorAll('.coeff-input').forEach(inp => {
+    const val = inp.value === '' ? 0 : parseInt(inp.value);
+    if (isNaN(val) || val === 0) return;
+    const mask = parseInt(inp.dataset.mask);
+    const li = parseInt(inp.dataset.li);
+    if (!target[mask]) target[mask] = {};
+    target[mask][li] = val;
+  });
+  const k = parseInt(document.getElementById('const-k').value) || 0;
+  if (k !== 0) {
+    const X = (1 << N) - 1;
+    if (!target[X]) target[X] = {};
+    for (let x = 0; x < N; x++) target[X][x] = (target[X][x] || 0) + k;
+  }
+  return target;
+}
+
+function getTargetVal(target, mask, x) {
+  return (target[mask] && target[mask][x] !== undefined) ? target[mask][x] : 0;
+}
+
+// ── MATLAB code generation ────────────────────────────────────────────────────
+
+function generateMatlabCode(target, optRep, optStd, numCores) {
+  const X = (1 << N) - 1;
+  const altsStr = alts.join('');
+  const lines = [];
+  const d = new Date().toISOString().slice(0, 10);
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  lines.push('%% Block-Marshak Solver');
+  lines.push('% Generated by: Block-Marshak MATLAB Solver Export');
+  lines.push('% https://paulhycheung.github.io/Block-Marshak-Game/matlabsolver');
+  lines.push('% Generated: ' + d);
+  lines.push('%');
+  lines.push('% N = ' + N + ' alternatives: {' + alts.join(', ') + '}');
+  const modeLabel = optStd
+    ? 'Standard BM (forward substitution, unique, no toolbox)'
+    : optRep
+      ? 'General BM — repeatable (non-negative integer LP, Optimization Toolbox)'
+      : 'General BM — non-repeatable (binary ILP, Optimization Toolbox)';
+  lines.push('% Mode: ' + modeLabel);
+  if (!optStd) lines.push('% Parallel cores: ' + numCores);
+  lines.push('%');
+  lines.push('% Output (printed to console):');
+  lines.push('%   LaTeX  — sum-of-q formula for the found decomposition');
+  lines.push('%   Save code — paste into the Block-Marshak Game main app');
+  lines.push('');
+  lines.push('clear; clc;');
+  lines.push('');
+
+  // ── Problem definition ───────────────────────────────────────────────────────
+  lines.push('%% ── Problem definition ───────────────────────────────────────────────────────');
+  lines.push('N    = ' + N + ';');
+  lines.push("alts = '" + altsStr + "'; % alts(x) is the x-th alternative (1-indexed)");
+  lines.push('');
+  lines.push('% Target polynomial rho(mask, x)');
+  lines.push('%   mask : integer 1..(2^N-1) — bitmask of subset S; bit k set ↔ alt k is in S');
+  lines.push('%   x    : integer 1..N       — alternative index');
+  lines.push('%   Value only meaningful when bitand(mask, 2^(x-1)) > 0  (alt x ∈ S)');
+  lines.push('rho = zeros(2^N - 1, N);');
+
+  let hasNonZero = false;
+  for (let mask = 1; mask < (1 << N); mask++) {
+    for (let x = 0; x < N; x++) {
+      if (!(mask & (1 << x))) continue;
+      const val = getTargetVal(target, mask, x);
+      if (val !== 0) {
+        const comment = '% rho(' + alts[x] + ', {' + maskToStr(mask) + '})';
+        lines.push('rho(' + mask + ', ' + (x + 1) + ') = ' + val + '; ' + comment);
+        hasNonZero = true;
+      }
+    }
+  }
+  if (!hasNonZero) {
+    lines.push('% (all zero — target polynomial is the zero function)');
+  }
+  lines.push('');
+
+  // ── Helper ───────────────────────────────────────────────────────────────────
+  lines.push('%% ── Helper ───────────────────────────────────────────────────────────────────');
+  lines.push("popcount = @(n) sum(dec2bin(n) == '1'); % set-bit count; popcount(0) = 0");
+  lines.push('');
+
+  if (optStd) {
+    // ── Standard BM: forward substitution ────────────────────────────────────
+    lines.push('%% ── Solve: Standard BM (forward substitution) ───────────────────────────────');
+    lines.push('% For each alternative x, process subsets S (smallest first).');
+    lines.push('% The system is lower-triangular with diagonal 1, giving a unique solution.');
+    lines.push('% coeff(mask, x) = multiplicity of action q_X(x, S=mask).');
+    lines.push('X_full = 2^N - 1;');
+    lines.push('coeff  = zeros(2^N - 1, N);');
+    lines.push('');
+    lines.push('for x = 1:N');
+    lines.push('    xbit = 2^(x - 1);');
+    lines.push('    for sz = 1:N');
+    lines.push('        for mask = 1:(2^N - 1)');
+    lines.push('            if popcount(mask) ~= sz,      continue; end');
+    lines.push('            if ~bitand(mask, xbit),        continue; end');
+    lines.push('            val = rho(mask, x);');
+    lines.push('            % subtract contributions of all proper subsets of mask that contain x');
+    lines.push('            sub = bitand(mask - 1, mask);');
+    lines.push('            while sub > 0');
+    lines.push('                if bitand(sub, xbit) && coeff(sub, x) ~= 0');
+    lines.push('                    excess = popcount(bitxor(mask, sub)); % |mask \\ sub|');
+    lines.push('                    val = val - coeff(sub, x) * (-1)^excess;');
+    lines.push('                end');
+    lines.push('                sub = bitand(sub - 1, mask);');
+    lines.push('            end');
+    lines.push('            coeff(mask, x) = val;');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push('end');
+    lines.push('');
+    lines.push('% Build action list: columns = [x, S, T, count]');
+    lines.push('actions = zeros(0, 4);');
+    lines.push('for x = 1:N');
+    lines.push('    for mask = 1:(2^N - 1)');
+    lines.push('        if ~bitand(mask, 2^(x - 1)), continue; end');
+    lines.push('        if coeff(mask, x) == 0,      continue; end');
+    lines.push('        actions(end + 1, :) = [x, mask, X_full, coeff(mask, x)];');
+    lines.push('    end');
+    lines.push('end');
+
+  } else {
+    // ── General BM: parallel pool + ILP ──────────────────────────────────────
+
+    if (numCores > 1) {
+      lines.push('%% ── Parallel pool setup ─────────────────────────────────────────────────────');
+      lines.push('numCores = ' + numCores + ';');
+      lines.push("pool = gcp('nocreate');");
+      lines.push('if isempty(pool)');
+      lines.push('    parpool(numCores);');
+      lines.push('elseif pool.NumWorkers < numCores');
+      lines.push('    delete(pool);');
+      lines.push('    parpool(numCores);');
+      lines.push('end');
+      lines.push('');
+    }
+
+    lines.push('%% ── Enumerate all valid BM actions ──────────────────────────────────────────');
+    lines.push('% A BM action (x, S, T) is valid when: x ∈ S  and  S ⊆ T ⊆ {1..N}');
+    lines.push('cands_x = [];');
+    lines.push('cands_S = [];');
+    lines.push('cands_T = [];');
+    lines.push('X_full  = 2^N - 1;');
+    lines.push('');
+    lines.push('for x = 1:N');
+    lines.push('    xbit = 2^(x - 1);');
+    lines.push('    for S = 1:(2^N - 1)');
+    lines.push('        if ~bitand(S, xbit), continue; end % x must be in S');
+    lines.push('        for T = S:(2^N - 1)');
+    lines.push('            if bitand(T, S) ~= S, continue; end % S must be subset of T');
+    lines.push('            cands_x(end + 1) = x;');
+    lines.push('            cands_S(end + 1) = S;');
+    lines.push('            cands_T(end + 1) = T;');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push('end');
+    lines.push('');
+    lines.push('m = length(cands_x);');
+    lines.push("fprintf('Candidate BM actions: %d\\n', m);");
+    lines.push('');
+
+    lines.push('%% ── Build constraint matrix ──────────────────────────────────────────────────');
+    lines.push('% Row index map: (mask, x) → row in the linear system');
+    lines.push('row_idx  = zeros(2^N - 1, N);');
+    lines.push('num_rows = 0;');
+    lines.push('for mask = 1:(2^N - 1)');
+    lines.push('    for x = 1:N');
+    lines.push('        if bitand(mask, 2^(x - 1))');
+    lines.push('            num_rows = num_rows + 1;');
+    lines.push('            row_idx(mask, x) = num_rows;');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push('end');
+    lines.push('');
+    lines.push('A_eq = zeros(num_rows, m);');
+    lines.push('b_eq = zeros(num_rows, 1);');
+    lines.push('');
+    lines.push('% Fill right-hand side from target polynomial');
+    lines.push('for mask = 1:(2^N - 1)');
+    lines.push('    for x = 1:N');
+    lines.push('        r = row_idx(mask, x);');
+    lines.push('        if r > 0');
+    lines.push('            b_eq(r) = rho(mask, x);');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push('end');
+    lines.push('');
+    lines.push('% Fill constraint matrix A_eq');
+    lines.push('% Column j encodes how action (cands_x(j), cands_S(j), cands_T(j)) affects each row.');
+    lines.push('% Contribution to rho(x, mask): (-1)^|mask\\S|  for all S ⊆ mask ⊆ T with x∈mask.');
+    lines.push('for j = 1:m');
+    lines.push('    xj = cands_x(j);');
+    lines.push('    Sj = cands_S(j);');
+    lines.push('    Tj = cands_T(j);');
+    lines.push('    % Iterate subsets of Tj that are supersets of Sj (x∈Sj ⊆ mask ⊆ Tj)');
+    lines.push('    TmS   = bitxor(Tj, bitand(Tj, Sj)); % bits in T not in S');
+    lines.push('    extra = TmS;');
+    lines.push('    while true');
+    lines.push('        mask   = bitor(Sj, extra);');
+    lines.push('        excess = popcount(extra);        % |mask \\ Sj|');
+    lines.push('        A_eq(row_idx(mask, xj), j) = (-1)^excess;');
+    lines.push('        if extra == 0, break; end');
+    lines.push('        extra = bitand(extra - 1, TmS);');
+    lines.push('    end');
+    lines.push('end');
+    lines.push('');
+
+    lines.push('%% ── Solve with intlinprog ────────────────────────────────────────────────────');
+    lines.push('% Minimise a zero objective (find any feasible integer point).');
+    lines.push('f_obj  = zeros(m, 1);');
+    lines.push('intcon = 1:m;          % all variables must be integers');
+    lines.push('lb     = zeros(m, 1);  % non-negative');
+    if (optRep) {
+      lines.push('ub     = [];           % no upper bound (any non-negative integer count)');
+    } else {
+      lines.push('ub     = ones(m, 1);   % binary: each action used at most once');
+    }
+    lines.push('');
+    lines.push("options = optimoptions('intlinprog', 'Display', 'iter');");
+    if (numCores > 1) {
+      lines.push('options.UseParallel = true; % distribute branch-and-bound across workers');
+    }
+    lines.push('');
+    lines.push("fprintf('Running intlinprog...\\n');");
+    lines.push('[c_sol, ~, exitflag, ~] = intlinprog(f_obj, intcon, [], [], A_eq, b_eq, lb, ub, options);');
+    lines.push('');
+    lines.push('if isempty(c_sol) || exitflag <= 0');
+    lines.push("    fprintf('\\nNo solution found (exitflag = %d).\\n', exitflag);");
+    lines.push("    fprintf('The target polynomial may not have a valid BM decomposition\\n');");
+    lines.push("    fprintf('under the chosen constraints. Try enabling Repeatable BM.\\n');");
+    lines.push('    return;');
+    lines.push('end');
+    lines.push('');
+    lines.push('c_sol = round(c_sol); % remove floating-point noise from branch-and-bound');
+    lines.push('');
+    lines.push('% Build action list: columns = [x, S, T, count]');
+    lines.push('actions = zeros(0, 4);');
+    lines.push('for j = 1:m');
+    lines.push('    if c_sol(j) > 0');
+    lines.push('        actions(end + 1, :) = [cands_x(j), cands_S(j), cands_T(j), c_sol(j)];');
+    lines.push('    end');
+    lines.push('end');
+  }
+
+  // ── Output section (shared by all modes) ─────────────────────────────────────
+  lines.push('');
+  lines.push('%% ── Generate LaTeX and save code ─────────────────────────────────────────────');
+  lines.push('if ~isempty(actions)');
+  lines.push('    actions = sortrows(actions, [1 2 3]);');
+  lines.push('end');
+  lines.push('');
+  lines.push('% Build LaTeX string: sum of q_T(x,\\,S) terms');
+  lines.push("latex_parts = {};");
+  lines.push('for i = 1:size(actions, 1)');
+  lines.push('    xi    = actions(i, 1);');
+  lines.push('    Si    = actions(i, 2);');
+  lines.push('    Ti    = actions(i, 3);');
+  lines.push('    cnt   = actions(i, 4);');
+  lines.push('    T_str = alts(logical(bitget(Ti, 1:N)));');
+  lines.push('    S_str = alts(logical(bitget(Si, 1:N)));');
+  lines.push('    if cnt > 1');
+  // In the MATLAB sprintf format, \\, becomes \, in the output (sprintf interprets \\ as \)
+  lines.push("        term = sprintf('%dq_{%s}(%s,\\\\,%s)', cnt, T_str, alts(xi), S_str);");
+  lines.push('    else');
+  lines.push("        term = sprintf('q_{%s}(%s,\\\\,%s)', T_str, alts(xi), S_str);");
+  lines.push('    end');
+  lines.push("    latex_parts{end + 1} = term;");
+  lines.push('end');
+  lines.push('');
+  lines.push('if isempty(latex_parts)');
+  lines.push("    latex_str = '0'; % target is zero polynomial");
+  lines.push('else');
+  lines.push("    latex_str = strjoin(latex_parts, ' + ');");
+  lines.push('end');
+  lines.push('');
+  lines.push('% Build save code: N|letter:sourceHex-targetHex|...');
+  lines.push("save_parts = {num2str(N)};");
+  lines.push('for i = 1:size(actions, 1)');
+  lines.push('    xi  = actions(i, 1);');
+  lines.push('    Si  = actions(i, 2);');
+  lines.push('    Ti  = actions(i, 3);');
+  lines.push('    cnt = actions(i, 4);');
+  lines.push('    for rep = 1:cnt');
+  lines.push("        save_parts{end + 1} = sprintf('%s:%s-%s', ...");
+  lines.push("            alts(xi), lower(dec2hex(Si)), lower(dec2hex(Ti)));");
+  lines.push('    end');
+  lines.push('end');
+  lines.push("save_code = strjoin(save_parts, '|');");
+  lines.push('');
+  lines.push('% Print results');
+  lines.push("fprintf('\\n================================================\\n');");
+  lines.push("fprintf('SOLUTION FOUND\\n');");
+  lines.push("fprintf('================================================\\n\\n');");
+  lines.push("fprintf('LaTeX (sum of q):\\n');");
+  lines.push('disp(latex_str);');
+  lines.push("fprintf('\\nSave code (paste into Block-Marshak Game):\\n');");
+  lines.push('disp(save_code);');
+  lines.push("fprintf('\\n================================================\\n');");
+
+  return lines.join('\n');
+}
+
+// ── Generate button ───────────────────────────────────────────────────────────
+
+function generate() {
+  const target  = getTarget();
+  const optRep  = document.getElementById('opt-repeatable').checked;
+  const optStd  = document.getElementById('opt-standard').checked;
+  const numCores = Math.max(1, parseInt(document.getElementById('cores-input').value) || 1);
+
+  const code = generateMatlabCode(target, optRep, optStd, numCores);
+  const ta   = document.getElementById('matlab-output');
+  ta.value   = code;
+
+  const panel = document.getElementById('output-panel');
+  panel.style.display = '';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyCode() {
+  const ta  = document.getElementById('matlab-output');
+  const btn = document.getElementById('copy-btn');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try { navigator.clipboard.writeText(ta.value); } catch { document.execCommand('copy'); }
+  btn.textContent = '✓ Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+}
+
+// ── Wiring ────────────────────────────────────────────────────────────────────
+
+document.getElementById('n-select').addEventListener('change', function () {
+  N = +this.value;
+  updateAlts();
+  renderDiagram();
+  document.getElementById('output-panel').style.display = 'none';
+});
+
+['opt-repeatable', 'opt-standard'].forEach(id =>
+  document.getElementById(id).addEventListener('change', updateModeInfo)
+);
+
+N = +document.getElementById('n-select').value;
+updateAlts();
+renderDiagram();
+</script>
+</body>
+</html>
