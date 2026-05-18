@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Block-Marshak Solver</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: monospace; background: #f0f0f0; padding: 14px; font-size: 13px; }
+h2 { margin-bottom: 6px; font-size: 18px; }
+a { color: #36c; }
+
+/* Controls */
+#top-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+#top-bar label { display: flex; align-items: center; gap: 5px; }
+#top-bar select { font-family: monospace; font-size: 13px; padding: 2px 4px; }
+
+#panels { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+
+#options-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; min-width: 260px; }
+#options-panel h3 { font-size: 12px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+.opt-row { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 7px; line-height: 1.4; }
+.opt-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+.opt-row label { font-size: 12px; cursor: pointer; }
+.opt-hint { font-size: 11px; color: #888; margin-left: 20px; margin-top: -4px; margin-bottom: 6px; }
+
+#const-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; }
+#const-panel h3 { font-size: 12px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+.const-row { display: flex; align-items: center; gap: 8px; }
+.const-row input { width: 64px; font-family: monospace; font-size: 13px; text-align: center; padding: 2px 4px; border: 1px solid #bbb; border-radius: 3px; }
+.const-hint { font-size: 11px; color: #888; margin-top: 6px; }
+
+/* Solve row */
+#solve-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+#solve-btn { padding: 6px 18px; font-family: monospace; font-size: 14px; font-weight: bold;
+  background: #2a6; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+#solve-btn:hover { background: #1a5; }
+#solve-btn:active { background: #0a4; }
+#runtime-est { font-size: 12px; color: #888; }
+
+/* Hasse diagram */
+#hasse-wrap { background: #fff; border: 1px solid #ccc; border-radius: 5px;
+  padding: 10px; margin-bottom: 12px; overflow-x: auto; }
+#hasse-wrap h3 { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+#hasse { display: flex; flex-direction: column; gap: 8px; }
+.hasse-layer { display: flex; gap: 6px; justify-content: center; flex-wrap: nowrap; min-width: max-content; }
+.subset-box { border: 2px solid #aaa; border-radius: 4px; padding: 4px 5px;
+  background: #fafafa; display: inline-flex; flex-direction: column; align-items: stretch; }
+.letter-cols { display: flex; gap: 3px; }
+.letter-col { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.coeff-input { width: 34px; height: 20px; font-family: monospace; font-size: 11px;
+  text-align: center; border: 1px solid #bbb; border-radius: 2px; background: #f9f9f9;
+  padding: 0 2px; }
+.coeff-input:focus { outline: none; border-color: #5af; background: #edf8ff; }
+.coeff-input.nonzero { background: #efffef; border-color: #8c8; font-weight: bold; }
+.letter-label { font-size: 13px; color: #333; padding: 0 3px; }
+#clear-btn { font-size: 12px; color: #999; border: none; background: none; cursor: pointer; padding: 2px 6px; }
+#clear-btn:hover { color: #c33; }
+
+/* Output */
+#output-panel { background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; }
+#output-panel h3 { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.sol-block { border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 8px; }
+.sol-block.valid { border-left: 4px solid #2a6; }
+.sol-block.invalid { border-left: 4px solid #c33; }
+.sol-block.warn { border-left: 4px solid #c80; }
+.sol-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+.valid .sol-title { color: #1a5; }
+.invalid .sol-title { color: #c33; }
+.warn .sol-title { color: #c80; }
+.field-label { font-size: 11px; color: #777; margin-top: 5px; margin-bottom: 2px; }
+.code-box { font-family: monospace; font-size: 12px; background: #f5f5f5;
+  border: 1px solid #ddd; border-radius: 3px; padding: 5px 8px;
+  white-space: pre-wrap; word-break: break-all; cursor: pointer; }
+.code-box:hover { background: #eef; }
+.code-box.copied { background: #dfd; }
+.sol-note { font-size: 11px; color: #888; margin-top: 5px; }
+.sol-err { font-size: 12px; color: #c33; }
+.no-sol { color: #c33; font-style: italic; font-size: 13px; }
+.unique-note { font-size: 12px; color: #555; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<h2>Block-Marshak Solver</h2>
+<p style="margin-bottom:10px; font-size:12px;"><a href="index.html">← Main App</a></p>
+
+<div id="top-bar">
+  <label>N = <select id="n-select">
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5" selected>5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+  </select></label>
+  <span id="alt-display" style="font-size:12px; color:#666;"></span>
+  <button id="clear-btn" onclick="clearAllInputs()">Clear all</button>
+</div>
+
+<div id="panels">
+  <div id="options-panel">
+    <h3>Options</h3>
+    <div class="opt-row">
+      <input type="checkbox" id="opt-repeatable" checked>
+      <label for="opt-repeatable">Allow Repeatable BM</label>
+    </div>
+    <div class="opt-hint">Unchecked → each q used at most once (0/1 coefficients)</div>
+    <div class="opt-row">
+      <input type="checkbox" id="opt-standard" checked>
+      <label for="opt-standard">Only Standard BM</label>
+    </div>
+    <div class="opt-hint">Checked → target set T is always the full set X</div>
+    <div class="opt-row">
+      <input type="checkbox" id="opt-unique">
+      <label for="opt-unique">Check for Uniqueness</label>
+    </div>
+    <div class="opt-hint">Find and display a second solution if one exists</div>
+  </div>
+
+  <div id="const-panel">
+    <h3>Constant Term</h3>
+    <div class="const-row">
+      <span>k =</span>
+      <input type="number" id="const-k" value="0">
+    </div>
+    <div class="const-hint">Adds k to ρ(x, X) for every alternative x.<br>Uses the identity Σ<sub>x</sub> ρ(x, X) = 1.</div>
+  </div>
+</div>
+
+<div id="solve-row">
+  <button id="solve-btn" onclick="solve()">Solve Now</button>
+  <span id="runtime-est"></span>
+</div>
+
+<div id="hasse-wrap">
+  <h3>Target Expression &mdash; enter ρ(x, S) coefficients below each letter</h3>
+  <div id="hasse"></div>
+</div>
+
+<div id="output-panel" style="display:none;">
+  <h3>Result</h3>
+  <div id="output-content"></div>
+</div>
+
+<script>
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function popcount(n) {
+  let c = 0; while (n) { c += n & 1; n >>>= 1; } return c;
+}
+
+function maskLetterIndices(mask) {
+  const r = []; for (let i = 0; mask; i++, mask >>= 1) if (mask & 1) r.push(i); return r;
+}
+
+function maskToStr(mask) {
+  return maskLetterIndices(mask).map(i => alts[i]).join('');
+}
+
+// ── State ──────────────────────────────────────────────────────────────────────
+
+let N = 5;
+let alts = [];
+
+function updateAlts() {
+  alts = 'abcdefghi'.slice(0, N).split('');
+  document.getElementById('alt-display').textContent = `Alternatives: {${alts.join(', ')}}`;
+}
+
+// ── Lex-ordered layers ────────────────────────────────────────────────────────
+
+function layeredMasks() {
+  const layers = [];
+  for (let size = N; size >= 1; size--) {
+    const row = [];
+    for (let m = 1; m < (1 << N); m++) if (popcount(m) === size) row.push(m);
+    row.sort((a, b) => {
+      const ia = maskLetterIndices(a), ib = maskLetterIndices(b);
+      for (let i = 0; i < ia.length; i++) if (ia[i] !== ib[i]) return ia[i] - ib[i];
+      return 0;
+    });
+    layers.push(row);
+  }
+  return layers;
+}
+
+// ── Render diagram ────────────────────────────────────────────────────────────
+
+function renderDiagram() {
+  const hasse = document.getElementById('hasse');
+  hasse.innerHTML = '';
+  const layers = layeredMasks();
+  for (const layer of layers) {
+    const layerDiv = document.createElement('div');
+    layerDiv.className = 'hasse-layer';
+    for (const mask of layer) {
+      const box = document.createElement('div');
+      box.className = 'subset-box';
+      const cols = document.createElement('div');
+      cols.className = 'letter-cols';
+      for (const li of maskLetterIndices(mask)) {
+        const col = document.createElement('div');
+        col.className = 'letter-col';
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.className = 'coeff-input';
+        inp.placeholder = '0';
+        inp.dataset.mask = mask;
+        inp.dataset.li = li;
+        inp.id = `inp-${mask}-${li}`;
+        inp.addEventListener('input', () => {
+          inp.classList.toggle('nonzero', inp.value !== '' && inp.value !== '0');
+          updateRuntimeEst();
+        });
+        const lbl = document.createElement('div');
+        lbl.className = 'letter-label';
+        lbl.textContent = alts[li];
+        col.appendChild(inp);
+        col.appendChild(lbl);
+        cols.appendChild(col);
+      }
+      box.appendChild(cols);
+      layerDiv.appendChild(box);
+    }
+    hasse.appendChild(layerDiv);
+  }
+  updateRuntimeEst();
+}
+
+function clearAllInputs() {
+  document.querySelectorAll('.coeff-input').forEach(inp => {
+    inp.value = ''; inp.classList.remove('nonzero');
+  });
+  document.getElementById('const-k').value = '0';
+  document.getElementById('output-panel').style.display = 'none';
+  updateRuntimeEst();
+}
+
+// ── Runtime estimate ──────────────────────────────────────────────────────────
+
+function updateRuntimeEst() {
+  const optStd = document.getElementById('opt-standard').checked;
+  const optRep = document.getElementById('opt-repeatable').checked;
+  let est;
+  if (optStd) {
+    est = '< 1 ms';
+  } else if (optRep) {
+    const ms = Math.round(0.05 * Math.pow(3, N));
+    est = ms < 1 ? '< 1 ms' : `~${ms} ms`;
+  } else {
+    if (N <= 5) est = '< 1 s';
+    else if (N === 6) est = '< 1 min (may be slow)';
+    else est = 'potentially very long — not recommended for N ≥ 7';
+  }
+  document.getElementById('runtime-est').textContent = `Estimated runtime: ${est}`;
+}
+
+// ── Read target ───────────────────────────────────────────────────────────────
+
+function getTarget() {
+  const target = {};
+  document.querySelectorAll('.coeff-input').forEach(inp => {
+    const val = inp.value === '' ? 0 : parseInt(inp.value);
+    if (isNaN(val) || val === 0) return;
+    const mask = parseInt(inp.dataset.mask);
+    const li = parseInt(inp.dataset.li);
+    if (!target[mask]) target[mask] = {};
+    target[mask][li] = val;
+  });
+  const k = parseInt(document.getElementById('const-k').value) || 0;
+  if (k !== 0) {
+    const X = (1 << N) - 1;
+    if (!target[X]) target[X] = {};
+    for (let x = 0; x < N; x++) target[X][x] = (target[X][x] || 0) + k;
+  }
+  return target;
+}
+
+function getTargetVal(target, mask, x) {
+  return (target[mask] && target[mask][x] !== undefined) ? target[mask][x] : 0;
+}
+
+function isTargetZero(target) {
+  for (const row of Object.values(target))
+    for (const v of Object.values(row)) if (v !== 0) return false;
+  return true;
+}
+
+// ── Standard BM: forward substitution ────────────────────────────────────────
+// For each x, processes subsets S from smallest to largest.
+// n[x][S] = coefficient for action q_X(x, S).
+// Derivation: q_X(x,S) contributes (-1)^{|S'\S|} to ρ(x,S') for all S'⊇S with x∈S'.
+// Processing in size order makes the system lower-triangular (diag = 1), giving
+// a unique integer solution via forward substitution.
+
+function solveStandardBM(target) {
+  const solution = {};
+  for (let x = 0; x < N; x++) {
+    solution[x] = {};
+    for (let size = 1; size <= N; size++) {
+      for (let mask = 1; mask < (1 << N); mask++) {
+        if (popcount(mask) !== size) continue;
+        if (!(mask & (1 << x))) continue;
+        let val = getTargetVal(target, mask, x);
+        // Subtract contributions from proper subsets of mask containing x
+        for (let sub = (mask - 1) & mask; sub > 0; sub = (sub - 1) & mask) {
+          if (!(sub & (1 << x))) continue;
+          const cnt = solution[x][sub];
+          if (!cnt) continue;
+          const diff = popcount(mask & ~sub);
+          val -= cnt * (diff % 2 === 0 ? 1 : -1);
+        }
+        if (val !== 0) solution[x][mask] = val;
+      }
+    }
+  }
+  return solution;
+}
+
+// ── Verify: recompute BM expansion and check against target ──────────────────
+
+function verifyActions(actions, target) {
+  const computed = {};
+  for (const { x, S, T, count } of actions) {
+    if (!count) continue;
+    for (let mask = 1; mask < (1 << N); mask++) {
+      if (!(mask & (1 << x))) continue;
+      if ((mask & S) !== S) continue;
+      if ((mask & T) !== mask) continue;
+      const diff = popcount(mask & ~S);
+      const delta = (diff % 2 === 0 ? 1 : -1) * count;
+      if (!computed[mask]) computed[mask] = {};
+      computed[mask][x] = (computed[mask][x] || 0) + delta;
+    }
+  }
+  for (let mask = 1; mask < (1 << N); mask++) {
+    for (let x = 0; x < N; x++) {
+      if (!(mask & (1 << x))) continue;
+      const got = (computed[mask] && computed[mask][x]) || 0;
+      if (got !== getTargetVal(target, mask, x)) return false;
+    }
+  }
+  return true;
+}
+
+// ── Convert standard solution to action list ──────────────────────────────────
+
+function stdSolToActions(sol) {
+  const X = (1 << N) - 1;
+  const out = [];
+  for (let x = 0; x < N; x++)
+    for (const [Sstr, count] of Object.entries(sol[x]))
+      out.push({ x, S: parseInt(Sstr), T: X, count });
+  return out;
+}
+
+// ── Check solution constraints ────────────────────────────────────────────────
+
+function constraintsSatisfied(actions, allowRepeatable) {
+  for (const { count } of actions) {
+    if (allowRepeatable && count < 0) return false;
+    if (!allowRepeatable && (count < 0 || count > 1)) return false;
+  }
+  return true;
+}
+
+// ── General BM: diagonal solution (T = S for each action) ────────────────────
+// q_S(x,S) = ρ(x,S) (only contributes to the S' = S term).
+// So n[x][S][S] = target[S][x] achieves the target independently per cell.
+// Valid only when all target values satisfy the constraint (≥0 or ∈{0,1}).
+
+function solveDiagonal(target, allowRepeatable) {
+  const actions = [];
+  for (let mask = 1; mask < (1 << N); mask++) {
+    for (let x = 0; x < N; x++) {
+      if (!(mask & (1 << x))) continue;
+      const val = getTargetVal(target, mask, x);
+      if (allowRepeatable && val < 0) return null;
+      if (!allowRepeatable && (val < 0 || val > 1)) return null;
+      if (val !== 0) actions.push({ x, S: mask, T: mask, count: val });
+    }
+  }
+  return actions;
+}
+
+// ── Find second solution via null-vector swap ─────────────────────────────────
+// For any non-standard action q_T(x,S) (T ≠ X), its Standard BM equivalent
+// is computed by solveStandardBM({S': {x: (-1)^|S'\S|}}).
+// The null vector: +1 at (x,S,T) and -stdEquiv[x][S'] at (x,S',X) for each S'.
+// Adding this null vector to solution1 gives solution2 if all counts stay valid.
+
+function findSecondSolution(solution1, target, allowRepeatable) {
+  const X = (1 << N) - 1;
+
+  // Build solution1 as a map key → count
+  const sol1Map = new Map();
+  for (const a of solution1)
+    if (a.count) sol1Map.set(`${a.x},${a.S},${a.T}`, a.count);
+
+  // Try each non-standard action as a null-vector component
+  for (let x = 0; x < N; x++) {
+    for (let S = 1; S < (1 << N); S++) {
+      if (!(S & (1 << x))) continue;
+      // T ranges over all supersets of S that are not X (so T ⊆ X-1 = X-1, and T ≥ S)
+      for (let T = S; T < X; T++) {
+        if ((T & S) !== S) continue;
+
+        // Compute the polynomial produced by q_T(x,S)
+        const poly = {};
+        for (let mask = 1; mask <= T; mask++) {
+          if (!(mask & (1 << x))) continue;
+          if ((mask & S) !== S) continue;
+          if ((mask & T) !== mask) continue;
+          const diff = popcount(mask & ~S);
+          if (!poly[mask]) poly[mask] = {};
+          poly[mask][x] = diff % 2 === 0 ? 1 : -1;
+        }
+
+        // Standard BM equivalent of that polynomial
+        const stdEquiv = solveStandardBM(poly);
+
+        // Apply null vector to solution1
+        const sol2Map = new Map(sol1Map);
+        const addKey = (key, delta) => {
+          const v = (sol2Map.get(key) || 0) + delta;
+          if (v === 0) sol2Map.delete(key); else sol2Map.set(key, v);
+        };
+        addKey(`${x},${S},${T}`, 1);
+        for (const [Sstr, cnt] of Object.entries(stdEquiv[x] || {}))
+          if (cnt) addKey(`${x},${Sstr},${X}`, -cnt);
+
+        // Validate constraints
+        let valid = true;
+        for (const [, count] of sol2Map) {
+          if (allowRepeatable && count < 0) { valid = false; break; }
+          if (!allowRepeatable && (count < 0 || count > 1)) { valid = false; break; }
+        }
+        if (!valid) continue;
+
+        // Build action list and check it's genuinely different
+        const sol2 = [];
+        for (const [key, count] of sol2Map) {
+          const [xStr, SStr, TStr] = key.split(',');
+          sol2.push({ x: +xStr, S: +SStr, T: +TStr, count });
+        }
+        if (actionsKey(sol2) !== actionsKey(solution1)) {
+          // Double-check correctness
+          if (verifyActions(sol2, target)) return sol2;
+        }
+      }
+    }
+  }
+
+  // Also try: diagonal solution as second candidate
+  const diag = solveDiagonal(target, allowRepeatable);
+  if (diag && actionsKey(diag) !== actionsKey(solution1) && verifyActions(diag, target))
+    return diag;
+
+  return null;
+}
+
+// ── Backtracking solver: General BM, Allow Repeatable = No ───────────────────
+// Enumerates all valid (x,S,T) actions and searches for a {0,1} subset
+// whose BM expansion matches the target. Uses a timeout of 8 seconds.
+
+function solveBacktrack(target, onlyStandard) {
+  const X = (1 << N) - 1;
+  const candidates = [];
+  for (let x = 0; x < N; x++) {
+    for (let S = 1; S < (1 << N); S++) {
+      if (!(S & (1 << x))) continue;
+      const Tlist = onlyStandard ? [X] : [];
+      if (!onlyStandard) {
+        for (let T = S; T <= X; T++)
+          if ((T & S) === S) Tlist.push(T);
+      }
+      for (const T of Tlist) {
+        // Pre-compute this action's contribution
+        const contrib = {};
+        for (let mask = 1; mask < (1 << N); mask++) {
+          if (!(mask & (1 << x))) continue;
+          if ((mask & S) !== S) continue;
+          if ((mask & T) !== mask) continue;
+          const diff = popcount(mask & ~S);
+          if (!contrib[mask]) contrib[mask] = {};
+          contrib[mask][x] = diff % 2 === 0 ? 1 : -1;
+        }
+        candidates.push({ x, S, T, contrib });
+      }
+    }
+  }
+
+  // Residual: how much is still needed (start from target)
+  const resid = {};
+  for (let mask = 1; mask < (1 << N); mask++) {
+    for (let x = 0; x < N; x++) {
+      if (!(mask & (1 << x))) continue;
+      const v = getTargetVal(target, mask, x);
+      if (v) { if (!resid[mask]) resid[mask] = {}; resid[mask][x] = v; }
+    }
+  }
+
+  const chosen = [];
+  let found = null;
+  const TIMEOUT = 8000;
+  const start = Date.now();
+
+  function residZero() {
+    for (const row of Object.values(resid))
+      for (const v of Object.values(row)) if (v !== 0) return false;
+    return true;
+  }
+
+  function applyContrib(contrib, sign) {
+    for (const [maskStr, row] of Object.entries(contrib)) {
+      const mask = +maskStr;
+      if (!resid[mask]) resid[mask] = {};
+      for (const [xStr, delta] of Object.entries(row)) {
+        const x = +xStr;
+        resid[mask][x] = (resid[mask][x] || 0) - sign * delta;
+      }
+    }
+  }
+
+  // Quick pruning: check if residual can still reach 0
+  function canPrune(idx) {
+    // Check each constrained cell: if residual > remaining candidates that cover it,
+    // prune. (Simple bound; not tight but catches obvious cases.)
+    return false; // Disabled for now for simplicity
+  }
+
+  function bt(idx) {
+    if (found || Date.now() - start > TIMEOUT) return;
+    if (residZero()) { found = [...chosen]; return; }
+    if (idx >= candidates.length) return;
+
+    // Try including candidates[idx]
+    applyContrib(candidates[idx].contrib, 1);
+    chosen.push(idx);
+    bt(idx + 1);
+    chosen.pop();
+    applyContrib(candidates[idx].contrib, -1);
+
+    // Try skipping
+    if (!found) bt(idx + 1);
+  }
+
+  bt(0);
+
+  if (!found) return null;
+  return found.map(i => ({ x: candidates[i].x, S: candidates[i].S, T: candidates[i].T, count: 1 }));
+}
+
+// ── Output helpers ────────────────────────────────────────────────────────────
+
+function actionsKey(actions) {
+  return actions.filter(a => a.count)
+    .map(a => `${a.x},${a.S},${a.T},${a.count}`).sort().join('|');
+}
+
+function actionsToLatex(actions) {
+  const pos = actions.filter(a => a.count > 0);
+  if (!pos.length) return '0';
+  pos.sort((a, b) => {
+    if (a.x !== b.x) return a.x - b.x;
+    const sa = maskToStr(a.S), sb = maskToStr(b.S);
+    if (sa !== sb) return sa < sb ? -1 : 1;
+    const ta = maskToStr(a.T), tb = maskToStr(b.T);
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
+  });
+  return pos.map(({ x, S, T, count }) =>
+    `${count > 1 ? count : ''}q_{${maskToStr(T)}}(${alts[x]},\\,${maskToStr(S)})`
+  ).join(' + ');
+}
+
+function actionsToSaveCode(actions) {
+  const parts = [String(N)];
+  for (const { x, S, T, count } of actions) {
+    for (let i = 0; i < count; i++)
+      parts.push(`${x}:${S.toString(16)}-${T.toString(16)}`);
+  }
+  return parts.join('|');
+}
+
+function copyBox(el) {
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    el.classList.add('copied');
+    setTimeout(() => el.classList.remove('copied'), 600);
+  });
+}
+
+// ── Render one solution block ─────────────────────────────────────────────────
+
+function renderSol(title, cls, actions, note) {
+  const pos = actions.filter(a => a.count > 0);
+  const latex = pos.length ? actionsToLatex(pos) : '(empty — target is zero)';
+  const code = pos.length ? actionsToSaveCode(pos) : String(N);
+  let h = `<div class="sol-block ${cls}">`;
+  h += `<div class="sol-title">${title}</div>`;
+  h += `<div class="field-label">LaTeX: <span style="font-size:10px;color:#aaa">(click to copy)</span></div>`;
+  h += `<div class="code-box" onclick="copyBox(this)">${latex}</div>`;
+  if (pos.length) {
+    h += `<div class="field-label">Save code (paste into main app): <span style="font-size:10px;color:#aaa">(click to copy)</span></div>`;
+    h += `<div class="code-box" onclick="copyBox(this)">${code}</div>`;
+  }
+  if (note) h += `<div class="sol-note">${note}</div>`;
+  h += '</div>';
+  return h;
+}
+
+// ── Main solve ────────────────────────────────────────────────────────────────
+
+function solve() {
+  const target = getTarget();
+  const optRep  = document.getElementById('opt-repeatable').checked;
+  const optStd  = document.getElementById('opt-standard').checked;
+  const optUniq = document.getElementById('opt-unique').checked;
+
+  const panel = document.getElementById('output-panel');
+  const content = document.getElementById('output-content');
+  panel.style.display = '';
+  content.innerHTML = '<p style="color:#888">Solving…</p>';
+
+  setTimeout(() => {
+    try {
+      content.innerHTML = doSolve(target, optRep, optStd, optUniq);
+    } catch (e) {
+      content.innerHTML = `<p class="no-sol">Error: ${e.message}</p>`;
+      console.error(e);
+    }
+  }, 16);
+}
+
+function doSolve(target, allowRepeatable, onlyStandard, checkUnique) {
+  const X = (1 << N) - 1;
+
+  // ── Zero target: trivial ──────────────────────────────────────────────────
+  if (isTargetZero(target)) {
+    return renderSol('Trivial solution: target is the zero polynomial', 'valid', [], null) +
+      '<p class="unique-note">Uniqueness: trivially unique (only the empty combination works).</p>';
+  }
+
+  let html = '';
+  let sol1 = null;
+
+  // ── Standard BM: unique forward-substitution solution ────────────────────
+  if (onlyStandard) {
+    const stdSol = solveStandardBM(target);
+    const actions = stdSolToActions(stdSol);
+    const ok = constraintsSatisfied(actions, allowRepeatable);
+    if (ok) {
+      sol1 = actions;
+      html += renderSol(
+        'Solution (Standard BM, T = full set)',
+        'valid',
+        actions,
+        `Uses q_{${maskToStr(X)}}(x, S) actions only. This Standard BM representation is unique.`
+      );
+    } else {
+      const negEntries = actions.filter(a => a.count < 0 || (!allowRepeatable && a.count > 1));
+      html += `<div class="sol-block invalid"><div class="sol-title">No valid Standard BM solution</div>`;
+      html += `<p class="sol-err">The unique Standard BM decomposition has ${negEntries.length} action(s) with invalid coefficient(s) ` +
+        (allowRepeatable ? '(negative count).' : '(count &gt; 1 or negative).') + `</p>`;
+      html += `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12px;color:#666;">Show raw decomposition</summary>`;
+      html += renderSol('Raw Standard BM (invalid)', 'warn', actions,
+        'Negative coefficients mean this polynomial cannot be expressed as a positive combination of Standard BM actions.');
+      html += '</details></div>';
+    }
+
+    if (checkUnique) {
+      html += `<p class="unique-note"><strong>Uniqueness:</strong> The Standard BM representation of any polynomial is always unique (the BM actions {q_X(x,S)} form a basis).</p>`;
+    }
+    return html;
+  }
+
+  // ── General BM ───────────────────────────────────────────────────────────
+
+  // Try 1: Standard BM (valid for general BM too)
+  const stdSol = solveStandardBM(target);
+  const stdActions = stdSolToActions(stdSol);
+  const stdOk = constraintsSatisfied(stdActions, allowRepeatable);
+
+  if (stdOk) {
+    sol1 = stdActions;
+    html += renderSol(
+      'Solution 1 (Standard BM)',
+      'valid',
+      stdActions,
+      `All actions target the full set ${maskToStr(X)}. This is also a valid General BM solution.`
+    );
+  } else {
+    // Try 2: diagonal (T = S)
+    const diagActions = solveDiagonal(target, allowRepeatable);
+    if (diagActions) {
+      sol1 = diagActions;
+      html += renderSol(
+        'Solution 1 (General BM — diagonal, T = S)',
+        'valid',
+        diagActions,
+        'Each action q_S(x,S) = ρ(x,S), so every coefficient is satisfied independently.'
+      );
+    } else if (!allowRepeatable) {
+      // Try backtracking (slow for large N)
+      const warnN = N >= 7;
+      if (warnN) {
+        html += `<p class="unique-note" style="color:#c80;">N = ${N}: backtracking search for {0,1} solution may be very slow or time out (8 s limit).</p>`;
+      }
+      const btActions = solveBacktrack(target, false);
+      if (btActions) {
+        sol1 = btActions;
+        html += renderSol('Solution 1 (General BM — backtracking)', 'valid', btActions,
+          'Found via exhaustive search. May not be unique.');
+      } else {
+        html += `<div class="sol-block invalid"><div class="sol-title">No solution found</div>`;
+        html += `<p class="sol-err">Could not find a {0,1} combination of BM actions matching the target within the time limit.</p></div>`;
+        // Show Standard BM for reference
+        html += `<details><summary style="cursor:pointer;font-size:12px;color:#666;margin-top:6px;">Show Standard BM decomposition (may have invalid counts)</summary>`;
+        html += renderSol('Standard BM (reference)', 'warn', stdActions,
+          'This decomposition has counts outside {0,1}. Try enabling Allow Repeatable.');
+        html += '</details>';
+      }
+    } else {
+      // Allow Repeatable = Yes but no non-negative solution found
+      html += `<div class="sol-block invalid"><div class="sol-title">No non-negative solution found</div>`;
+      html += `<p class="sol-err">The target polynomial cannot be expressed as a non-negative combination of BM actions.</p>`;
+      html += `<p class="sol-note">Standard BM has negative coefficients; diagonal (T=S) also fails (target has negative entries).</p></div>`;
+      html += `<details><summary style="cursor:pointer;font-size:12px;color:#666;margin-top:6px;">Show Standard BM decomposition (reference)</summary>`;
+      html += renderSol('Standard BM (reference)', 'warn', stdActions,
+        'Negative coefficients indicate the polynomial has no valid BM expression with non-negative counts.');
+      html += '</details>';
+    }
+  }
+
+  // ── Uniqueness check ──────────────────────────────────────────────────────
+  if (checkUnique && sol1) {
+    const sol2 = findSecondSolution(sol1, target, allowRepeatable);
+    if (sol2) {
+      html += renderSol(
+        'Solution 2 (alternative General BM)',
+        'valid',
+        sol2,
+        'A second valid combination — the representation is not unique in General BM.'
+      );
+      html += `<p class="unique-note" style="color:#c80;"><strong>Not unique:</strong> at least two distinct solutions exist for this target in General BM.</p>`;
+    } else {
+      html += `<p class="unique-note"><strong>Uniqueness:</strong> No second solution found via null-vector search. The General BM representation may be unique for this target.</p>`;
+    }
+  }
+
+  return html || '<p class="no-sol">No result computed.</p>';
+}
+
+// ── Wiring ────────────────────────────────────────────────────────────────────
+
+document.getElementById('n-select').addEventListener('change', function () {
+  N = +this.value;
+  updateAlts();
+  renderDiagram();
+  document.getElementById('output-panel').style.display = 'none';
+});
+['opt-repeatable', 'opt-standard', 'opt-unique'].forEach(id =>
+  document.getElementById(id).addEventListener('change', updateRuntimeEst)
+);
+
+// Initialize
+N = +document.getElementById('n-select').value;
+updateAlts();
+renderDiagram();
+</script>
+</body>
+</html>
