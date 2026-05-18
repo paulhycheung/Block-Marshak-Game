@@ -316,6 +316,20 @@ function getTarget() {
   return target;
 }
 
+// Returns diagram entries only — no k applied (base target for k-placement search)
+function getTargetBase() {
+  const target = {};
+  document.querySelectorAll('.coeff-input').forEach(inp => {
+    const val = inp.value === '' ? 0 : parseInt(inp.value);
+    if (isNaN(val) || val === 0) return;
+    const mask = parseInt(inp.dataset.mask);
+    const li = parseInt(inp.dataset.li);
+    if (!target[mask]) target[mask] = {};
+    target[mask][li] = val;
+  });
+  return target;
+}
+
 function getTargetVal(target, mask, x) {
   return (target[mask] && target[mask][x] !== undefined) ? target[mask][x] : 0;
 }
@@ -393,7 +407,7 @@ function updateConfigCode() {
 
 // ── MATLAB code generation ────────────────────────────────────────────────────
 
-function generateMatlabCode(target, optRep, optStd, numCores) {
+function generateMatlabCode(targetBase, kVal, optRep, optStd, numCores) {
   const X = (1 << N) - 1;
   const altsStr = alts.join('');
   const lines = [];
@@ -412,6 +426,13 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
       ? 'General BM — repeatable (non-negative integer LP, Optimization Toolbox)'
       : 'General BM — non-repeatable (binary ILP, Optimization Toolbox)';
   lines.push('% Mode: ' + modeLabel);
+  if (kVal !== 0) {
+    if (optStd) {
+      lines.push('% k = ' + kVal + ' — will search for a single (x,S) placement giving non-negative Standard BM');
+    } else {
+      lines.push('% k = ' + kVal + ' — applied to rho(x, X) for all x (standard convention)');
+    }
+  }
   if (!optStd) lines.push('% Parallel cores: ' + numCores);
   lines.push('%');
   lines.push('% Output (printed to console):');
@@ -436,7 +457,7 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
   for (let mask = 1; mask < (1 << N); mask++) {
     for (let x = 0; x < N; x++) {
       if (!(mask & (1 << x))) continue;
-      const val = getTargetVal(target, mask, x);
+      const val = getTargetVal(targetBase, mask, x);
       if (val !== 0) {
         const comment = '% rho(' + alts[x] + ', {' + maskToStr(mask) + '})';
         lines.push('rho(' + mask + ', ' + (x + 1) + ') = ' + val + '; ' + comment);
@@ -444,8 +465,19 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
       }
     }
   }
-  if (!hasNonZero) {
+  if (!hasNonZero && kVal === 0) {
     lines.push('% (all zero — target polynomial is the zero function)');
+  } else if (!hasNonZero && optStd) {
+    lines.push('% (diagram entries are all zero; k-placement search will add k below)');
+  }
+
+  // For General BM (ILP), apply k to all X entries here (ILP solves rho as-is)
+  if (!optStd && kVal !== 0) {
+    const X = (1 << N) - 1;
+    lines.push('% Constant term k=' + kVal + ': add to rho(x, X) for all x');
+    for (let x = 0; x < N; x++) {
+      lines.push('rho(' + X + ', ' + (x + 1) + ') = rho(' + X + ', ' + (x + 1) + ') + (' + kVal + '); % rho(' + alts[x] + ', {' + altsStr + '})');
+    }
   }
   lines.push('');
 
@@ -455,44 +487,93 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
   lines.push('');
 
   if (optStd) {
-    // ── Standard BM: forward substitution ────────────────────────────────────
+    // ── Standard BM: forward substitution (+ k-placement search if k≠0) ──────
     lines.push('%% ── Solve: Standard BM (forward substitution) ───────────────────────────────');
-    lines.push('% For each alternative x, process subsets S (smallest first).');
-    lines.push('% The system is lower-triangular with diagonal 1, giving a unique solution.');
-    lines.push('% coeff(mask, x) = multiplicity of action q_X(x, S=mask).');
     lines.push('X_full = 2^N - 1;');
-    lines.push('coeff  = zeros(2^N - 1, N);');
     lines.push('');
-    lines.push('for x = 1:N');
-    lines.push('    xbit = 2^(x - 1);');
-    lines.push('    for sz = 1:N');
-    lines.push('        for mask = 1:(2^N - 1)');
-    lines.push('            if popcount(mask) ~= sz,      continue; end');
-    lines.push('            if ~bitand(mask, xbit),        continue; end');
-    lines.push('            val = rho(mask, x);');
-    lines.push('            % subtract contributions of all proper subsets of mask that contain x');
-    lines.push('            sub = bitand(mask - 1, mask);');
-    lines.push('            while sub > 0');
-    lines.push('                if bitand(sub, xbit) && coeff(sub, x) ~= 0');
-    lines.push('                    excess = popcount(bitxor(mask, sub)); % |mask \\ sub|');
-    lines.push('                    val = val - coeff(sub, x) * (-1)^excess;');
-    lines.push('                end');
-    lines.push('                sub = bitand(sub - 1, mask);');
-    lines.push('            end');
-    lines.push('            coeff(mask, x) = val;');
-    lines.push('        end');
-    lines.push('    end');
-    lines.push('end');
-    lines.push('');
-    lines.push('% Build action list: columns = [x, S, T, count]');
-    lines.push('actions = zeros(0, 4);');
-    lines.push('for x = 1:N');
-    lines.push('    for mask = 1:(2^N - 1)');
-    lines.push('        if ~bitand(mask, 2^(x - 1)), continue; end');
-    lines.push('        if coeff(mask, x) == 0,      continue; end');
-    lines.push('        actions(end + 1, :) = [x, mask, X_full, coeff(mask, x)];');
-    lines.push('    end');
-    lines.push('end');
+
+    if (kVal === 0) {
+      // No k — solve directly
+      lines.push('% k = 0: solve directly');
+      lines.push('coeff = stdBM(rho, N);');
+      lines.push('');
+      lines.push('% Build action list: columns = [x, S, T, count]');
+      lines.push('actions = zeros(0, 4);');
+      lines.push('for x = 1:N');
+      lines.push('    for mask = 1:(2^N - 1)');
+      lines.push('        if ~bitand(mask, 2^(x - 1)), continue; end');
+      lines.push('        if coeff(mask, x) == 0,      continue; end');
+      lines.push('        actions(end + 1, :) = [x, mask, X_full, coeff(mask, x)];');
+      lines.push('    end');
+      lines.push('end');
+    } else {
+      // k ≠ 0 — search for best single-box placement
+      lines.push('% k = ' + kVal + ': search for a single (x,S) placement that gives non-negative Standard BM.');
+      lines.push('% rho currently holds the base diagram entries (k not yet applied).');
+      lines.push('k_val = ' + kVal + ';');
+      lines.push('');
+      lines.push('% Build candidate placements: every valid (mask, x) with x ∈ mask,');
+      lines.push('% ordered largest-subset-first (full set X tried before smaller subsets).');
+      lines.push('cand_masks = zeros(1, 0);');
+      lines.push('cand_xs    = zeros(1, 0);');
+      lines.push('for sz = N:-1:1');
+      lines.push('    for mask = 1:(2^N - 1)');
+      lines.push('        if popcount(mask) ~= sz, continue; end');
+      lines.push('        for x = 1:N');
+      lines.push('            if bitand(mask, 2^(x - 1))');
+      lines.push('                cand_masks(end + 1) = mask;');
+      lines.push('                cand_xs(end + 1)    = x;');
+      lines.push('            end');
+      lines.push('        end');
+      lines.push('    end');
+      lines.push('end');
+      lines.push('');
+      lines.push("fprintf('Searching %d candidate placements for k=%d ...\\n', numel(cand_masks), k_val);");
+      lines.push('found_placement = false;');
+      lines.push('place_mask = 0; place_x = 0;');
+      lines.push('best_coeff = [];');
+      lines.push('');
+      lines.push('for ci = 1:numel(cand_masks)');
+      lines.push('    rho_trial = rho;');
+      lines.push('    rho_trial(cand_masks(ci), cand_xs(ci)) = rho_trial(cand_masks(ci), cand_xs(ci)) + k_val;');
+      lines.push('    c_trial = stdBM(rho_trial, N);');
+      lines.push('    if all(c_trial(:) >= 0)');
+      lines.push('        found_placement = true;');
+      lines.push('        best_coeff = c_trial;');
+      lines.push('        place_mask = cand_masks(ci);');
+      lines.push('        place_x    = cand_xs(ci);');
+      lines.push('        break;');
+      lines.push('    end');
+      lines.push('end');
+      lines.push('');
+      lines.push('if found_placement');
+      lines.push('    S_str = alts(logical(bitget(place_mask, 1:N)));');
+      lines.push("    fprintf('Found non-negative placement: k=%d at rho(%s, {%s})\\n', k_val, alts(place_x), S_str);");
+      lines.push('    % Update rho so the verifier checks against the actual target used');
+      lines.push('    rho(place_mask, place_x) = rho(place_mask, place_x) + k_val;');
+      lines.push('    coeff = best_coeff;');
+      lines.push('else');
+      lines.push("    fprintf('\\n*** No single-box placement of k=%d yields non-negative Standard BM. ***\\n', k_val);");
+      lines.push("    fprintf('Falling back: applying k to all X entries (solution may have negative coefficients).\\n');");
+      lines.push("    fprintf('Consider switching to General BM mode for a guaranteed non-negative solution.\\n\\n');");
+      lines.push('    rho_fallback = rho;');
+      lines.push('    for xi = 1:N');
+      lines.push('        rho_fallback(X_full, xi) = rho_fallback(X_full, xi) + k_val;');
+      lines.push('    end');
+      lines.push('    rho   = rho_fallback;');
+      lines.push('    coeff = stdBM(rho, N);');
+      lines.push('end');
+      lines.push('');
+      lines.push('% Build action list: columns = [x, S, T, count]');
+      lines.push('actions = zeros(0, 4);');
+      lines.push('for x = 1:N');
+      lines.push('    for mask = 1:(2^N - 1)');
+      lines.push('        if ~bitand(mask, 2^(x - 1)), continue; end');
+      lines.push('        if coeff(mask, x) == 0,      continue; end');
+      lines.push('        actions(end + 1, :) = [x, mask, X_full, coeff(mask, x)];');
+      lines.push('    end');
+      lines.push('end');
+    }
 
   } else {
     // ── General BM: parallel pool + ILP ──────────────────────────────────────
@@ -725,18 +806,50 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
   lines.push('disp(save_code);');
   lines.push("fprintf('\\n================================================\\n');");
 
+  if (optStd) {
+    // Local function used by Standard BM solve (and k-placement search)
+    lines.push('');
+    lines.push('%% ── Local function ───────────────────────────────────────────────────────────');
+    lines.push('function coeff = stdBM(rho_t, N)');
+    lines.push('% Forward substitution: unique Standard BM decomposition.');
+    lines.push('% coeff(mask, x) = multiplicity of q_X(x, S=mask).');
+    lines.push("    popcount_f = @(n) sum(dec2bin(n) == '1');");
+    lines.push('    coeff = zeros(2^N - 1, N);');
+    lines.push('    for x = 1:N');
+    lines.push('        xbit = 2^(x - 1);');
+    lines.push('        for sz = 1:N');
+    lines.push('            for mask = 1:(2^N - 1)');
+    lines.push('                if popcount_f(mask) ~= sz,  continue; end');
+    lines.push('                if ~bitand(mask, xbit),      continue; end');
+    lines.push('                val = rho_t(mask, x);');
+    lines.push('                sub = bitand(mask - 1, mask);');
+    lines.push('                while sub > 0');
+    lines.push('                    if bitand(sub, xbit) && coeff(sub, x) ~= 0');
+    lines.push('                        excess = popcount_f(bitxor(mask, sub));');
+    lines.push('                        val = val - coeff(sub, x) * (-1)^excess;');
+    lines.push('                    end');
+    lines.push('                    sub = bitand(sub - 1, mask);');
+    lines.push('                end');
+    lines.push('                coeff(mask, x) = val;');
+    lines.push('            end');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push('end');
+  }
+
   return lines.join('\n');
 }
 
 // ── Generate button ───────────────────────────────────────────────────────────
 
 function generate() {
-  const target  = getTarget();
-  const optRep  = document.getElementById('opt-repeatable').checked;
-  const optStd  = document.getElementById('opt-standard').checked;
+  const targetBase = getTargetBase();
+  const kVal     = parseInt(document.getElementById('const-k').value) || 0;
+  const optRep   = document.getElementById('opt-repeatable').checked;
+  const optStd   = document.getElementById('opt-standard').checked;
   const numCores = Math.max(1, parseInt(document.getElementById('cores-input').value) || 1);
 
-  const code = generateMatlabCode(target, optRep, optStd, numCores);
+  const code = generateMatlabCode(targetBase, kVal, optRep, optStd, numCores);
   const ta   = document.getElementById('matlab-output');
   ta.value   = code;
 
