@@ -417,6 +417,38 @@
     }
     #btn-copy:hover { background: #3869aa; }
     #btn-copy.copied { background: #2a8a5a; }
+
+    #latex-panel {
+      padding: 0.9rem 1rem;
+      border-top: 2px solid #e4e0d8;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #latex-panel h4 { font-size: 0.85rem; color: #666; }
+
+    #latex-code {
+      width: 100%;
+      height: 64px;
+      font-family: monospace;
+      font-size: 0.73rem;
+      border: 1.5px solid #ddd;
+      border-radius: 7px;
+      padding: 0.4rem 0.5rem;
+      resize: none;
+      background: #fafaf8;
+      color: #333;
+    }
+
+    #btn-copy-latex {
+      background: #4a7bbd;
+      color: white;
+      width: 100%;
+      padding: 0.45rem;
+    }
+    #btn-copy-latex:hover { background: #3869aa; }
+    #btn-copy-latex.copied { background: #2a8a5a; }
   </style>
 </head>
 <body>
@@ -474,6 +506,11 @@
       <div id="actions-list">
         <p class="no-actions-msg">No actions yet.</p>
       </div>
+    </div>
+    <div id="latex-panel">
+      <h4>LaTeX</h4>
+      <textarea id="latex-code" readonly></textarea>
+      <button id="btn-copy-latex" onclick="copyLatex()">Copy</button>
     </div>
     <div id="code-panel">
       <h4>Save Code</h4>
@@ -765,7 +802,8 @@ function cancelSelection() {
 function renderAll() {
   renderHasse();
   renderSidebar();
-  document.getElementById('save-code').value = generateCode();
+  document.getElementById('save-code').value  = generateCode();
+  document.getElementById('latex-code').value = generateLatex();
 }
 
 function renderHasse() {
@@ -933,7 +971,8 @@ function handleActionEdit(idx, newRaw) {
 
   recomputeAll();
   renderHasse();
-  document.getElementById('save-code').value = generateCode();
+  document.getElementById('save-code').value  = generateCode();
+  document.getElementById('latex-code').value = generateLatex();
 }
 
 // Submit the new-action input (Enter or blur)
@@ -950,6 +989,28 @@ function handleNewActionSubmit(inputEl) {
 function focusNewActionInput() {
   const ni = document.getElementById('new-action-input');
   if (ni) ni.focus();
+}
+
+// ─── LaTeX ────────────────────────────────────────────────
+function generateLatex() {
+  const terms = [];
+  for (const action of actions) {
+    if (!action.parsed) continue;
+    const { x, S, T } = action.parsed;
+    terms.push(`q_{${maskToStr(T)}}(${alts[x]}, ${maskToStr(S)})`);
+  }
+  return terms.join(' + ');
+}
+
+function copyLatex() {
+  const ta  = document.getElementById('latex-code');
+  const btn = document.getElementById('btn-copy-latex');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try { navigator.clipboard.writeText(ta.value); } catch { document.execCommand('copy'); }
+  btn.textContent = '✓ Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
 }
 
 // ─── Copy code button ────────────────────────────────────
