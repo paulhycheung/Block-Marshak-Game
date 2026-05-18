@@ -756,19 +756,22 @@ function goBack() {
 // ═══════════════════════════════════════════════════════════
 //  INTERACTION HANDLERS
 // ═══════════════════════════════════════════════════════════
-function handleLetterClick(mask, li) {
+function handleLetterClick(mask, li, ctrlHeld) {
+  const fullSet = (1 << N) - 1;
+
+  // Ctrl+click: instantly apply action with the grand set as target
+  if (ctrlHeld && mask !== fullSet) {
+    selLetter = null;
+    selSource = null;
+    actions.push({ raw: actionToText(li, mask, fullSet), parsed: { x: li, S: mask, T: fullSet } });
+    recomputeAll();
+    renderAll();
+    return;
+  }
+
   if (selLetter !== null && selSource !== null) {
-    // ── Already selecting ──
-    if (isValidTarget(mask)) {
-      // Clicking any letter inside a valid target box → apply action
-      finishSelection(mask);
-      return;
-    }
-    // Clicking same letter in same source → deselect
-    if (selLetter === li && selSource === mask) {
-      cancelSelection();
-      return;
-    }
+    if (isValidTarget(mask)) { finishSelection(mask); return; }
+    if (selLetter === li && selSource === mask) { cancelSelection(); return; }
     // Otherwise start a fresh selection on this new letter/box
   }
   selLetter = li;
@@ -858,7 +861,7 @@ function makeBoxEl(mask) {
     letter.className = 'letter-cell';
     letter.textContent = alts[li];
     if (selLetter === li && selSource === mask) letter.classList.add('is-active');
-    letter.addEventListener('click', e => { e.stopPropagation(); handleLetterClick(mask, li); });
+    letter.addEventListener('click', e => { e.stopPropagation(); handleLetterClick(mask, li, e.ctrlKey); });
 
     col.appendChild(coeff);
     col.appendChild(letter);
