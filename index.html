@@ -275,6 +275,13 @@
     .letter-cell:hover      { color: #d07000; font-weight: bold; font-style: italic; }
     .letter-cell.is-active  { color: #d07000; font-weight: bold; font-style: italic; }
 
+    /* suppress hover glow on all other letters once one is selected */
+    #hasse.selecting-mode .letter-cell:hover:not(.is-active) {
+      color: #222;
+      font-weight: normal;
+      font-style: normal;
+    }
+
     /* ─── SIDEBAR ────────────────────────────────────── */
     #sidebar {
       width: 272px;
@@ -763,6 +770,7 @@ function renderAll() {
 
 function renderHasse() {
   const hasse  = document.getElementById('hasse');
+  hasse.classList.toggle('selecting-mode', selLetter !== null);
   const layers = layeredMasks();
   hasse.innerHTML = '';
 
