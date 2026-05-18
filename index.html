@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Block-Marshak Game</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #f0ede8;
+      min-height: 100vh;
+      color: #222;
+    }
+
+    /* ─── SCREEN SWITCHING ─────────────────────────── */
+    .screen { display: none; }
+    .screen.active { display: flex; }
+
+    /* ─── START SCREEN ─────────────────────────────── */
+    #screen-start {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 2.5rem;
+      padding: 2rem;
+    }
+
+    #screen-start h1 {
+      font-size: 2.2rem;
+      letter-spacing: 0.04em;
+      color: #1a1a2e;
+    }
+
+    #screen-start .subtitle {
+      font-size: 0.95rem;
+      color: #666;
+      font-style: italic;
+      margin-top: -1.5rem;
+      text-align: center;
+    }
+
+    .start-card {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.10);
+      padding: 2rem 2.5rem;
+      display: flex;
+      gap: 2.5rem;
+      align-items: stretch;
+      max-width: 680px;
+      width: 100%;
+    }
+
+    .start-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .start-section h3 {
+      font-size: 1rem;
+      color: #333;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 0.5rem;
+    }
+
+    .start-section p {
+      font-size: 0.87rem;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-top: 0.3rem;
+    }
+
+    input[type="number"] {
+      width: 64px;
+      padding: 0.45rem 0.5rem;
+      border: 2px solid #ddd;
+      border-radius: 7px;
+      font-size: 1.1rem;
+      text-align: center;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input[type="number"]:focus { outline: none; border-color: #4a7bbd; }
+
+    textarea.code-input {
+      flex: 1;
+      padding: 0.5rem;
+      border: 2px solid #ddd;
+      border-radius: 7px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      resize: vertical;
+      min-height: 72px;
+      transition: border-color 0.15s;
+    }
+    textarea.code-input:focus { outline: none; border-color: #4a7bbd; }
+
+    .or-divider {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #bbb;
+      font-size: 0.85rem;
+      gap: 0.4rem;
+      padding: 0 0.5rem;
+    }
+    .or-divider::before, .or-divider::after {
+      content: '';
+      display: block;
+      width: 1px;
+      flex: 1;
+      background: #e0e0e0;
+    }
+
+    /* ─── BUTTONS ───────────────────────────────────── */
+    button {
+      padding: 0.45rem 1.1rem;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: background 0.15s, transform 0.08s, box-shadow 0.15s;
+    }
+    button:active { transform: scale(0.96); }
+
+    .btn-primary { background: #4a7bbd; color: white; }
+    .btn-primary:hover { background: #3869aa; box-shadow: 0 2px 8px rgba(74,123,189,0.35); }
+
+    .btn-ghost { background: #ebebeb; color: #444; }
+    .btn-ghost:hover { background: #ddd; }
+
+    .btn-danger { background: none; border: 1.5px solid #c0392b; color: #c0392b; border-radius: 50%; width: 22px; height: 22px; padding: 0; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .btn-danger:hover { background: #c0392b; color: white; }
+
+    /* ─── MAIN SCREEN ───────────────────────────────── */
+    #screen-main {
+      flex-direction: row;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ─── DIAGRAM AREA ─────────────────────────────── */
+    #diagram-area {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 1.2rem 1.5rem;
+      gap: 1rem;
+    }
+
+    .diagram-topbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .diagram-topbar h2 {
+      font-size: 1.05rem;
+      color: #333;
+      font-weight: normal;
+    }
+
+    #hint-bar {
+      font-size: 0.82rem;
+      color: #888;
+      font-style: italic;
+    }
+
+    #hint-bar.selecting {
+      color: #c06000;
+      font-style: normal;
+      font-weight: bold;
+    }
+
+    /* ─── HASSE DIAGRAM ────────────────────────────── */
+    #hasse {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      align-items: center;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .hasse-layer {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ─── SUBSET BOX ────────────────────────────────── */
+    .subset-box {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      border: 2px solid #c8c2b8;
+      border-radius: 9px;
+      background: white;
+      padding: 3px 5px 4px;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+
+    .subset-box.is-source {
+      border-color: #4a7bbd;
+      background: #f0f5ff;
+      box-shadow: 0 0 0 3px rgba(74,123,189,0.18);
+    }
+
+    .subset-box.is-target {
+      border-color: #d07000;
+      background: #fff9f0;
+      box-shadow: 0 0 10px rgba(208,112,0,0.25);
+      cursor: pointer;
+    }
+
+    .subset-box.is-target:hover {
+      background: #fff2d8;
+      box-shadow: 0 0 14px rgba(208,112,0,0.40);
+    }
+
+    /* coefficient row above letters */
+    .coeff-row {
+      display: flex;
+      min-height: 16px;
+      align-items: flex-end;
+    }
+
+    .coeff-cell {
+      font-size: 0.65rem;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .coeff-pos  { color: #2178b4; }   /* light blue  */
+    .coeff-neg  { color: #8b1a1a; }   /* dark red    */
+    .coeff-zero { color: #111;    }   /* black       */
+
+    /* letter row */
+    .letter-row { display: flex; }
+
+    .letter-cell {
+      text-align: center;
+      font-size: 1rem;
+      padding: 1px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      line-height: 1.35;
+      transition: color 0.1s;
+      color: #222;
+    }
+
+    .letter-cell:hover      { color: #d07000; font-weight: bold; font-style: italic; }
+    .letter-cell.is-active  { color: #d07000; font-weight: bold; font-style: italic; }
+
+    /* ─── SIDEBAR ────────────────────────────────────── */
+    #sidebar {
+      width: 272px;
+      background: white;
+      border-left: 2px solid #e4e0d8;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    #actions-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    #actions-panel h3 {
+      font-size: 0.95rem;
+      color: #333;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+    }
+
+    .selection-hint-box {
+      background: #fff8ec;
+      border: 1px solid #f0d090;
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.82rem;
+      color: #7a4800;
+      line-height: 1.5;
+    }
+
+    .selection-hint-box strong { color: #c06000; }
+
+    .action-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #f5f3f0;
+    }
+
+    .action-label {
+      flex: 1;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #333;
+    }
+
+    .no-actions-msg {
+      color: #bbb;
+      font-size: 0.85rem;
+      font-style: italic;
+    }
+
+    /* ─── CODE PANEL ─────────────────────────────────── */
+    #code-panel {
+      padding: 0.9rem 1rem;
+      border-top: 2px solid #e4e0d8;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #code-panel h4 { font-size: 0.85rem; color: #666; }
+
+    #save-code {
+      width: 100%;
+      height: 72px;
+      font-family: monospace;
+      font-size: 0.73rem;
+      border: 1.5px solid #ddd;
+      border-radius: 7px;
+      padding: 0.4rem 0.5rem;
+      resize: none;
+      background: #fafaf8;
+      color: #333;
+    }
+
+    #btn-copy {
+      background: #4a7bbd;
+      color: white;
+      width: 100%;
+      padding: 0.45rem;
+    }
+    #btn-copy:hover { background: #3869aa; }
+    #btn-copy.copied { background: #2a8a5a; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 1 — START
+═══════════════════════════════════════════════ -->
+<div id="screen-start" class="screen active">
+  <h1>Block-Marshak Game</h1>
+  <p class="subtitle">Interactive visualizer for interim Block-Marshak polynomials</p>
+
+  <div class="start-card">
+
+    <div class="start-section">
+      <h3>Create New</h3>
+      <p>Choose the number of alternatives (2–9) and click Create New.</p>
+      <div class="input-row">
+        <input type="number" id="n-input" min="2" max="9" value="4">
+        <button class="btn-primary" onclick="handleCreateNew()">Create New</button>
+      </div>
+    </div>
+
+    <div class="or-divider">or</div>
+
+    <div class="start-section">
+      <h3>Load Save</h3>
+      <p>Paste a save code from a previous session and click Load Save.</p>
+      <textarea class="code-input" id="code-input-start" placeholder="Paste save code here…"></textarea>
+      <div>
+        <button class="btn-ghost" onclick="handleLoadSave()">Load Save</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 2 — MAIN
+═══════════════════════════════════════════════ -->
+<div id="screen-main" class="screen">
+
+  <div id="diagram-area">
+    <div class="diagram-topbar">
+      <button class="btn-ghost" onclick="goBack()" style="padding:0.4rem 0.8rem;font-size:0.82rem;">← Back</button>
+      <h2 id="diagram-title"></h2>
+      <span id="hint-bar">Click a letter inside any box to begin</span>
+    </div>
+    <div id="hasse"></div>
+  </div>
+
+  <div id="sidebar">
+    <div id="actions-panel">
+      <h3>Actions</h3>
+      <div id="selection-hint" style="display:none" class="selection-hint-box"></div>
+      <div id="actions-list">
+        <p class="no-actions-msg">No actions yet.</p>
+      </div>
+    </div>
+    <div id="code-panel">
+      <h4>Save Code</h4>
+      <textarea id="save-code" readonly></textarea>
+      <button id="btn-copy" onclick="copyCode()">Copy All</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let N       = 0;
+let alts    = [];          // ['a','b','c','d',...]
+let coeffs  = {};          // mask -> { letterIdx -> number }
+let touched = {};          // mask -> Set<letterIdx>  (ever received calculation)
+let actions = [];          // [{x, S, T}]
+
+// UI selection state
+let selLetter = null;      // letterIdx or null
+let selSource = null;      // mask or null
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════
+function popcount(n) {
+  let c = 0;
+  while (n) { c += n & 1; n >>>= 1; }
+  return c;
+}
+
+function maskLetterIndices(mask) {
+  const out = [];
+  for (let i = 0; i < N; i++) if (mask & (1 << i)) out.push(i);
+  return out;
+}
+
+function maskToStr(mask) {
+  return maskLetterIndices(mask).map(i => alts[i]).join('');
+}
+
+function layeredMasks() {
+  const layers = [];
+  for (let size = 1; size <= N; size++) {
+    const row = [];
+    for (let m = 1; m < (1 << N); m++) if (popcount(m) === size) row.push(m);
+    layers.push(row);
+  }
+  return layers;
+}
+
+function getCoeff(mask, li) {
+  return (coeffs[mask] && coeffs[mask][li] !== undefined) ? coeffs[mask][li] : 0;
+}
+
+function isTouched(mask, li) {
+  return !!(touched[mask] && touched[mask].has(li));
+}
+
+function isValidTarget(mask) {
+  if (selLetter === null || selSource === null) return false;
+  return (mask & selSource) === selSource && mask !== selSource;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CORE BM LOGIC
+// ═══════════════════════════════════════════════════════════
+// Apply (or reverse) the coefficient deltas for action (x, S, T).
+// sign = +1 to apply, -1 to undo.
+function applyDelta(x, S, T, sign) {
+  for (let mask = 1; mask < (1 << N); mask++) {
+    if (!(mask & (1 << x))) continue;   // x not in S'
+    if ((mask & S) !== S)   continue;   // S not ⊆ S'
+    if ((mask & T) !== mask) continue;  // S' not ⊆ T
+
+    const diff  = T & ~mask;
+    const delta = sign * (popcount(diff) % 2 === 0 ? 1 : -1);
+
+    if (!coeffs[mask]) coeffs[mask] = {};
+    coeffs[mask][x] = (coeffs[mask][x] || 0) + delta;
+
+    if (!touched[mask]) touched[mask] = new Set();
+    touched[mask].add(x);
+  }
+}
+
+// Rebuild `touched` from scratch using the current actions list.
+function rebuildTouched() {
+  touched = {};
+  for (const { x, S, T } of actions) {
+    for (let mask = 1; mask < (1 << N); mask++) {
+      if (!(mask & (1 << x))) continue;
+      if ((mask & S) !== S)   continue;
+      if ((mask & T) !== mask) continue;
+      if (!touched[mask]) touched[mask] = new Set();
+      touched[mask].add(x);
+    }
+  }
+}
+
+function doApplyAction(x, S, T) {
+  applyDelta(x, S, T, +1);
+  actions.push({ x, S, T });
+  renderAll();
+}
+
+function doUndoAction(idx) {
+  const { x, S, T } = actions[idx];
+  applyDelta(x, S, T, -1);
+  actions.splice(idx, 1);
+  rebuildTouched();   // recalculate which cells are still touched
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SAVE / LOAD CODE
+// ═══════════════════════════════════════════════════════════
+// Format: "N|x:Shex-Thex|..."
+// Example: "4|a:1-7|a:3-f"
+
+function generateCode() {
+  const parts = [`${N}`];
+  for (const { x, S, T } of actions) {
+    parts.push(`${alts[x]}:${S.toString(16)}-${T.toString(16)}`);
+  }
+  return parts.join('|');
+}
+
+function parseCode(raw) {
+  raw = raw.trim();
+  const parts = raw.split('|');
+  const n = parseInt(parts[0], 10);
+  if (isNaN(n) || n < 2 || n > 9) return null;
+
+  const parsed = [];
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i].trim();
+    if (!p) continue;
+    const m = p.match(/^([a-zA-Z]):([0-9a-fA-F]+)-([0-9a-fA-F]+)$/);
+    if (!m) return null;
+
+    const letterChar = m[1].toLowerCase();
+    const x = 'abcdefghi'.indexOf(letterChar);
+    const S = parseInt(m[2], 16);
+    const T = parseInt(m[3], 16);
+
+    if (x < 0 || x >= n)              return null;
+    if (S < 1 || S >= (1 << n))       return null;
+    if (T < 1 || T >= (1 << n))       return null;
+    if (!(S & (1 << x)))               return null;  // x must be in S
+    if ((T & S) !== S || T === S)      return null;  // T must properly contain S
+
+    parsed.push({ x, S, T });
+  }
+  return { n, actions: parsed };
+}
+
+function initGame(n, loadedActions) {
+  N       = n;
+  alts    = 'abcdefghi'.slice(0, N).split('');
+  coeffs  = {};
+  touched = {};
+  actions = [];
+  selLetter = null;
+  selSource = null;
+
+  if (loadedActions) {
+    for (const a of loadedActions) {
+      applyDelta(a.x, a.S, a.T, +1);
+      actions.push(a);
+    }
+    rebuildTouched();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SCREEN / NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function handleCreateNew() {
+  const n = parseInt(document.getElementById('n-input').value, 10);
+  if (isNaN(n) || n < 2 || n > 9) {
+    alert('Please enter a whole number between 2 and 9.');
+    return;
+  }
+  initGame(n, null);
+  openMain();
+}
+
+function handleLoadSave() {
+  const raw    = document.getElementById('code-input-start').value;
+  const parsed = parseCode(raw);
+  if (!parsed) {
+    alert('Could not read that save code — please check it and try again.');
+    return;
+  }
+  initGame(parsed.n, parsed.actions);
+  openMain();
+}
+
+function openMain() {
+  document.getElementById('diagram-title').textContent =
+    `N = ${N}   alternatives: { ${alts.join(', ')} }`;
+  showScreen('screen-main');
+  renderAll();
+}
+
+function goBack() {
+  selLetter = null;
+  selSource = null;
+  showScreen('screen-start');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INTERACTION HANDLERS
+// ═══════════════════════════════════════════════════════════
+function handleLetterClick(mask, li) {
+  if (selLetter !== null && selSource !== null) {
+    // ── Already selecting ──
+    if (isValidTarget(mask)) {
+      // Clicking any letter inside a valid target box → apply action
+      finishSelection(mask);
+      return;
+    }
+    // Clicking same letter in same source → deselect
+    if (selLetter === li && selSource === mask) {
+      cancelSelection();
+      return;
+    }
+    // Otherwise start a fresh selection on this new letter/box
+  }
+  selLetter = li;
+  selSource = mask;
+  renderAll();
+}
+
+function handleTargetBoxClick(mask) {
+  if (!isValidTarget(mask)) return;
+  finishSelection(mask);
+}
+
+function finishSelection(targetMask) {
+  const x = selLetter;
+  const S = selSource;
+  const T = targetMask;
+  selLetter = null;
+  selSource = null;
+  doApplyAction(x, S, T);
+}
+
+function cancelSelection() {
+  selLetter = null;
+  selSource = null;
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDERING
+// ═══════════════════════════════════════════════════════════
+function renderAll() {
+  renderHasse();
+  renderSidebar();
+  document.getElementById('save-code').value = generateCode();
+}
+
+// Width of each letter column (in px) — scales down for large N
+function letterWidth() {
+  if (N <= 5)  return 22;
+  if (N <= 7)  return 19;
+  return 16;
+}
+
+function renderHasse() {
+  const hasse  = document.getElementById('hasse');
+  const layers = layeredMasks();
+  hasse.innerHTML = '';
+
+  for (const layer of layers) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'hasse-layer';
+    for (const mask of layer) rowEl.appendChild(makeBoxEl(mask));
+    hasse.appendChild(rowEl);
+  }
+}
+
+function makeBoxEl(mask) {
+  const box = document.createElement('div');
+  box.className = 'subset-box';
+
+  const isSource = (selSource === mask);
+  const isTarget = isValidTarget(mask);
+
+  if (isSource) box.classList.add('is-source');
+  if (isTarget) {
+    box.classList.add('is-target');
+    box.addEventListener('click', () => handleTargetBoxClick(mask));
+  }
+
+  const indices = maskLetterIndices(mask);
+  const w = letterWidth();
+
+  // ── coefficient row ──────────────────────────────
+  const coeffRow = document.createElement('div');
+  coeffRow.className = 'coeff-row';
+
+  for (const li of indices) {
+    const cell = document.createElement('span');
+    cell.className = 'coeff-cell';
+    cell.style.width = w + 'px';
+
+    const val     = getCoeff(mask, li);
+    const wasTouched = isTouched(mask, li);
+
+    if (wasTouched) {
+      cell.textContent = String(val);
+      if      (val > 0) cell.classList.add('coeff-pos');
+      else if (val < 0) cell.classList.add('coeff-neg');
+      else              cell.classList.add('coeff-zero');
+    }
+    // if never touched: cell stays empty
+
+    coeffRow.appendChild(cell);
+  }
+
+  // ── letter row ───────────────────────────────────
+  const letterRow = document.createElement('div');
+  letterRow.className = 'letter-row';
+
+  for (const li of indices) {
+    const cell = document.createElement('span');
+    cell.className = 'letter-cell';
+    cell.style.width = w + 'px';
+    cell.textContent = alts[li];
+
+    if (selLetter === li && selSource === mask) cell.classList.add('is-active');
+
+    cell.addEventListener('click', e => {
+      e.stopPropagation();
+      handleLetterClick(mask, li);
+    });
+
+    letterRow.appendChild(cell);
+  }
+
+  box.appendChild(coeffRow);
+  box.appendChild(letterRow);
+  return box;
+}
+
+// ── Sidebar ──────────────────────────────────────────────
+function renderSidebar() {
+  renderHint();
+  renderActionsList();
+}
+
+function renderHint() {
+  const hintBar = document.getElementById('hint-bar');
+  const hintBox = document.getElementById('selection-hint');
+
+  if (selLetter !== null) {
+    hintBar.textContent = 'Click an orange box to apply the BM action';
+    hintBar.classList.add('selecting');
+
+    hintBox.style.display = '';
+    hintBox.innerHTML =
+      `<strong>${alts[selLetter]}</strong> selected in {${maskToStr(selSource)}}<br>` +
+      `Click any <span style="color:#d07000;font-weight:bold;">highlighted</span> superset to apply q<sub>T</sub>(${alts[selLetter]}, {${maskToStr(selSource)}}).<br><br>` +
+      `<button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;" onclick="cancelSelection()">Cancel</button>`;
+  } else {
+    hintBar.textContent = 'Click a letter inside any box to begin';
+    hintBar.classList.remove('selecting');
+    hintBox.style.display = 'none';
+  }
+}
+
+function renderActionsList() {
+  const list = document.getElementById('actions-list');
+  list.innerHTML = '';
+
+  if (actions.length === 0) {
+    list.innerHTML = '<p class="no-actions-msg">No actions yet.</p>';
+    return;
+  }
+
+  // Show newest at top
+  for (let idx = actions.length - 1; idx >= 0; idx--) {
+    const { x, S, T } = actions[idx];
+    const item = document.createElement('div');
+    item.className = 'action-item';
+
+    const label = document.createElement('span');
+    label.className = 'action-label';
+    label.textContent = `${alts[x]}: {${maskToStr(S)}} → {${maskToStr(T)}}`;
+
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'btn-danger';
+    undoBtn.textContent = '×';
+    undoBtn.title = 'Undo this action';
+    undoBtn.addEventListener('click', () => doUndoAction(idx));
+
+    item.appendChild(label);
+    item.appendChild(undoBtn);
+    list.appendChild(item);
+  }
+}
+
+// ─── Copy code button ────────────────────────────────────
+function copyCode() {
+  const ta  = document.getElementById('save-code');
+  const btn = document.getElementById('btn-copy');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try { navigator.clipboard.writeText(ta.value); } catch { document.execCommand('copy'); }
+  btn.textContent = '✓ Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy All'; btn.classList.remove('copied'); }, 1800);
+}
+
+// ─── Keyboard shortcut ───────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') cancelSelection();
+});
+
+document.getElementById('n-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleCreateNew();
+});
+</script>
+</body>
+</html>
