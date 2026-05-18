@@ -235,11 +235,13 @@
       box-shadow: 0 0 14px rgba(208,112,0,0.40);
     }
 
-    /* coefficient row above letters */
-    .coeff-row {
+    /* per-letter columns: coeff sits directly above its letter */
+    .letter-cols { display: flex; }
+
+    .letter-col {
       display: flex;
-      min-height: 16px;
-      align-items: flex-end;
+      flex-direction: column;
+      align-items: center;
     }
 
     .coeff-cell {
@@ -251,14 +253,12 @@
       pointer-events: none;
       min-width: 0.6rem;
       padding: 0 1px;
+      min-height: 1.1em; /* always reserve space even when empty */
     }
 
-    .coeff-pos  { color: #2178b4; }   /* light blue  */
-    .coeff-neg  { color: #8b1a1a; }   /* dark red    */
-    .coeff-zero { color: #111;    }   /* black       */
-
-    /* letter row */
-    .letter-row { display: flex; }
+    .coeff-pos  { color: #2178b4; }
+    .coeff-neg  { color: #8b1a1a; }
+    .coeff-zero { color: #111;    }
 
     .letter-cell {
       text-align: center;
@@ -796,49 +796,38 @@ function makeBoxEl(mask) {
   }
 
   const indices = maskLetterIndices(mask);
-  // ── coefficient row ──────────────────────────────
-  const coeffRow = document.createElement('div');
-  coeffRow.className = 'coeff-row';
+  const cols = document.createElement('div');
+  cols.className = 'letter-cols';
 
   for (const li of indices) {
-    const cell = document.createElement('span');
-    cell.className = 'coeff-cell';
+    const col = document.createElement('div');
+    col.className = 'letter-col';
 
-    const val     = getCoeff(mask, li);
+    // coeff cell — always present to reserve vertical space
+    const coeff = document.createElement('span');
+    coeff.className = 'coeff-cell';
+    const val        = getCoeff(mask, li);
     const wasTouched = isTouched(mask, li);
-
     if (wasTouched) {
-      cell.textContent = String(val);
-      if      (val > 0) cell.classList.add('coeff-pos');
-      else if (val < 0) cell.classList.add('coeff-neg');
-      else              cell.classList.add('coeff-zero');
+      coeff.textContent = String(val);
+      if      (val > 0) coeff.classList.add('coeff-pos');
+      else if (val < 0) coeff.classList.add('coeff-neg');
+      else              coeff.classList.add('coeff-zero');
     }
-    // if never touched: cell stays empty
 
-    coeffRow.appendChild(cell);
+    // letter cell
+    const letter = document.createElement('span');
+    letter.className = 'letter-cell';
+    letter.textContent = alts[li];
+    if (selLetter === li && selSource === mask) letter.classList.add('is-active');
+    letter.addEventListener('click', e => { e.stopPropagation(); handleLetterClick(mask, li); });
+
+    col.appendChild(coeff);
+    col.appendChild(letter);
+    cols.appendChild(col);
   }
 
-  // ── letter row ───────────────────────────────────
-  const letterRow = document.createElement('div');
-  letterRow.className = 'letter-row';
-
-  for (const li of indices) {
-    const cell = document.createElement('span');
-    cell.className = 'letter-cell';
-    cell.textContent = alts[li];
-
-    if (selLetter === li && selSource === mask) cell.classList.add('is-active');
-
-    cell.addEventListener('click', e => {
-      e.stopPropagation();
-      handleLetterClick(mask, li);
-    });
-
-    letterRow.appendChild(cell);
-  }
-
-  box.appendChild(coeffRow);
-  box.appendChild(letterRow);
+  box.appendChild(cols);
   return box;
 }
 
