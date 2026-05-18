@@ -502,7 +502,7 @@ function applyDelta(x, S, T, sign) {
     if ((mask & S) !== S)   continue;   // S not ⊆ S'
     if ((mask & T) !== mask) continue;  // S' not ⊆ T
 
-    const diff  = T & ~mask;
+    const diff  = mask & ~S;   // |S' \ S|: steps up from source to S'
     const delta = sign * (popcount(diff) % 2 === 0 ? 1 : -1);
 
     if (!coeffs[mask]) coeffs[mask] = {};
