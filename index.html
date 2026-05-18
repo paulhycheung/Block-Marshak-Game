@@ -759,11 +759,12 @@ function goBack() {
 function handleLetterClick(mask, li, ctrlHeld) {
   const fullSet = (1 << N) - 1;
 
-  // Ctrl+click: instantly apply action with the grand set as target
-  if (ctrlHeld && mask !== fullSet) {
+  // Ctrl+click: instantly apply self-action (grand set as target, or self if already grand set)
+  if (ctrlHeld) {
+    const T = (1 << N) - 1; // grand set
     selLetter = null;
     selSource = null;
-    actions.push({ raw: actionToText(li, mask, fullSet), parsed: { x: li, S: mask, T: fullSet } });
+    actions.push({ raw: actionToText(li, mask, T), parsed: { x: li, S: mask, T } });
     recomputeAll();
     renderAll();
     return;
@@ -996,13 +997,37 @@ function focusNewActionInput() {
 
 // ─── LaTeX ────────────────────────────────────────────────
 function generateLatex() {
-  const terms = [];
+  // Count occurrences of each unique (x, S, T) triple
+  const counts = new Map();
   for (const action of actions) {
     if (!action.parsed) continue;
     const { x, S, T } = action.parsed;
-    terms.push(`q_{${maskToStr(T)}}(${alts[x]}, ${maskToStr(S)})`);
+    const key = `${x}|${S}|${T}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
   }
-  return terms.join(' + ');
+
+  if (counts.size === 0) return '';
+
+  // Sort: by letter x (alphabetical), then source S (lex), then target T (lex)
+  const entries = [...counts.entries()]
+    .map(([key, count]) => {
+      const [x, S, T] = key.split('|').map(Number);
+      return { x, S, T, count };
+    })
+    .sort((a, b) => {
+      if (a.x !== b.x) return a.x - b.x;
+      const sa = maskToStr(a.S), sb = maskToStr(b.S);
+      if (sa !== sb) return sa < sb ? -1 : 1;
+      const ta = maskToStr(a.T), tb = maskToStr(b.T);
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+
+  return entries
+    .map(({ x, S, T, count }) => {
+      const coeff = count > 1 ? `${count}` : '';
+      return `${coeff}q_{${maskToStr(T)}}(${alts[x]}, ${maskToStr(S)})`;
+    })
+    .join(' + ');
 }
 
 function copyLatex() {
