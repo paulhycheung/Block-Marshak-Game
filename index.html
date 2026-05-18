@@ -249,6 +249,8 @@
       line-height: 1;
       user-select: none;
       pointer-events: none;
+      min-width: 0.6rem;
+      padding: 0 1px;
     }
 
     .coeff-pos  { color: #2178b4; }   /* light blue  */
@@ -261,7 +263,7 @@
     .letter-cell {
       text-align: center;
       font-size: 1rem;
-      padding: 1px 0;
+      padding: 1px 1px;
       border-radius: 4px;
       cursor: pointer;
       user-select: none;
@@ -468,7 +470,7 @@ function maskToStr(mask) {
 
 function layeredMasks() {
   const layers = [];
-  for (let size = 1; size <= N; size++) {
+  for (let size = N; size >= 1; size--) {
     const row = [];
     for (let m = 1; m < (1 << N); m++) if (popcount(m) === size) row.push(m);
     layers.push(row);
@@ -694,13 +696,6 @@ function renderAll() {
   document.getElementById('save-code').value = generateCode();
 }
 
-// Width of each letter column (in px) — scales down for large N
-function letterWidth() {
-  if (N <= 5)  return 22;
-  if (N <= 7)  return 19;
-  return 16;
-}
-
 function renderHasse() {
   const hasse  = document.getElementById('hasse');
   const layers = layeredMasks();
@@ -728,8 +723,6 @@ function makeBoxEl(mask) {
   }
 
   const indices = maskLetterIndices(mask);
-  const w = letterWidth();
-
   // ── coefficient row ──────────────────────────────
   const coeffRow = document.createElement('div');
   coeffRow.className = 'coeff-row';
@@ -737,7 +730,6 @@ function makeBoxEl(mask) {
   for (const li of indices) {
     const cell = document.createElement('span');
     cell.className = 'coeff-cell';
-    cell.style.width = w + 'px';
 
     const val     = getCoeff(mask, li);
     const wasTouched = isTouched(mask, li);
@@ -760,7 +752,6 @@ function makeBoxEl(mask) {
   for (const li of indices) {
     const cell = document.createElement('span');
     cell.className = 'letter-cell';
-    cell.style.width = w + 'px';
     cell.textContent = alts[li];
 
     if (selLetter === li && selSource === mask) cell.classList.add('is-active');
