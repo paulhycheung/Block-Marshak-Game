@@ -260,6 +260,12 @@
     .coeff-neg  { color: #8b1a1a; }
     .coeff-zero { color: #111;    }
 
+    /* hover-preview: show the would-be result in a dimmed italic style */
+    .coeff-cell.coeff-preview          { opacity: 0.42; font-style: italic; }
+    .coeff-cell.coeff-preview.coeff-pos  { color: #2178b4; }
+    .coeff-cell.coeff-preview.coeff-neg  { color: #8b1a1a; }
+    .coeff-cell.coeff-preview.coeff-zero { color: #555;    }
+
     .letter-cell {
       text-align: center;
       font-size: 1rem;
@@ -800,6 +806,49 @@ function cancelSelection() {
   renderAll();
 }
 
+// ── Hover preview ────────────────────────────────────────────────────────────
+// When the mouse enters a valid target box T, compute what q_T(selLetter,selSource)
+// would add to each affected ρ coefficient and show the resulting value dimmed.
+// Operates directly on existing DOM ids (cc-{mask}-{li}) without a full re-render.
+
+function applyHoverPreview(T) {
+  if (selLetter === null || selSource === null) return;
+  const x = selLetter, S = selSource;
+  for (let mask = 1; mask < (1 << N); mask++) {
+    if (!(mask & (1 << x))) continue;
+    if ((mask & S) !== S) continue;
+    if ((mask & T) !== mask) continue;
+    const diff  = popcount(mask & ~S);
+    const delta = diff % 2 === 0 ? 1 : -1;
+    const el = document.getElementById(`cc-${mask}-${x}`);
+    if (!el) continue;
+    const newVal = getCoeff(mask, x) + delta;
+    el.textContent = String(newVal);
+    el.className = 'coeff-cell coeff-preview';
+    if      (newVal > 0) el.classList.add('coeff-pos');
+    else if (newVal < 0) el.classList.add('coeff-neg');
+    else                 el.classList.add('coeff-zero');
+  }
+}
+
+function clearHoverPreview() {
+  document.querySelectorAll('.coeff-cell.coeff-preview').forEach(el => {
+    const parts = el.id.split('-');           // ['cc', mask, li]
+    const mask = +parts[1], li = +parts[2];
+    const val        = getCoeff(mask, li);
+    const wasTouched = isTouched(mask, li);
+    el.className = 'coeff-cell';
+    if (wasTouched) {
+      el.textContent = String(val);
+      if      (val > 0) el.classList.add('coeff-pos');
+      else if (val < 0) el.classList.add('coeff-neg');
+      else              el.classList.add('coeff-zero');
+    } else {
+      el.textContent = '';
+    }
+  });
+}
+
 // ═══════════════════════════════════════════════════════════
 //  RENDERING
 // ═══════════════════════════════════════════════════════════
@@ -835,6 +884,8 @@ function makeBoxEl(mask) {
   if (isTarget) {
     box.classList.add('is-target');
     box.addEventListener('click', () => handleTargetBoxClick(mask));
+    box.addEventListener('mouseenter', () => applyHoverPreview(mask));
+    box.addEventListener('mouseleave', clearHoverPreview);
   }
 
   const indices = maskLetterIndices(mask);
@@ -848,6 +899,7 @@ function makeBoxEl(mask) {
     // coeff cell — always present to reserve vertical space
     const coeff = document.createElement('span');
     coeff.className = 'coeff-cell';
+    coeff.id = `cc-${mask}-${li}`;
     const val        = getCoeff(mask, li);
     const wasTouched = isTouched(mask, li);
     if (wasTouched) {
