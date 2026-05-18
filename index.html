@@ -323,10 +323,52 @@
       border-bottom: 1px solid #f5f3f0;
     }
 
-    .action-label {
+    .action-input {
       flex: 1;
+      min-width: 0;
+      border: 1.5px solid #ddd;
+      border-radius: 5px;
+      padding: 0.22rem 0.4rem;
       font-family: monospace;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
+      color: #333;
+      background: white;
+      transition: border-color 0.15s;
+    }
+    .action-input:focus { outline: none; border-color: #4a7bbd; }
+
+    .action-item.has-error .action-input {
+      border-color: #c0392b;
+      background: #fff5f5;
+    }
+
+    .action-error-icon {
+      display: none;
+      color: #c0392b;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+      cursor: default;
+    }
+    .action-item.has-error .action-error-icon { display: inline; }
+
+    .new-action-row { padding: 0.4rem 0 0.1rem; }
+
+    .new-action-input {
+      width: 100%;
+      border: 1.5px dashed #bbb;
+      border-radius: 5px;
+      padding: 0.28rem 0.4rem;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #999;
+      background: #fafafa;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .new-action-input:focus {
+      outline: none;
+      border-color: #4a7bbd;
+      border-style: solid;
+      background: white;
       color: #333;
     }
 
@@ -443,7 +485,7 @@ let N       = 0;
 let alts    = [];          // ['a','b','c','d',...]
 let coeffs  = {};          // mask -> { letterIdx -> number }
 let touched = {};          // mask -> Set<letterIdx>  (ever received calculation)
-let actions = [];          // [{x, S, T}]
+let actions = [];          // [{raw: string, parsed: {x,S,T}|null}]
 
 // UI selection state
 let selLetter = null;      // letterIdx or null
@@ -492,64 +534,83 @@ function isValidTarget(mask) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  CORE BM LOGIC
+//  CORE BM LOGIC — recompute everything from scratch
 // ═══════════════════════════════════════════════════════════
-// Apply (or reverse) the coefficient deltas for action (x, S, T).
-// sign = +1 to apply, -1 to undo.
-function applyDelta(x, S, T, sign) {
-  for (let mask = 1; mask < (1 << N); mask++) {
-    if (!(mask & (1 << x))) continue;   // x not in S'
-    if ((mask & S) !== S)   continue;   // S not ⊆ S'
-    if ((mask & T) !== mask) continue;  // S' not ⊆ T
-
-    const diff  = mask & ~S;   // |S' \ S|: steps up from source to S'
-    const delta = sign * (popcount(diff) % 2 === 0 ? 1 : -1);
-
-    if (!coeffs[mask]) coeffs[mask] = {};
-    coeffs[mask][x] = (coeffs[mask][x] || 0) + delta;
-
-    if (!touched[mask]) touched[mask] = new Set();
-    touched[mask].add(x);
-  }
-}
-
-// Rebuild `touched` from scratch using the current actions list.
-function rebuildTouched() {
+function recomputeAll() {
+  coeffs  = {};
   touched = {};
-  for (const { x, S, T } of actions) {
+  for (const action of actions) {
+    if (!action.parsed) continue;
+    const { x, S, T } = action.parsed;
     for (let mask = 1; mask < (1 << N); mask++) {
       if (!(mask & (1 << x))) continue;
       if ((mask & S) !== S)   continue;
       if ((mask & T) !== mask) continue;
+      const diff  = mask & ~S;   // |S' \ S|
+      const delta = popcount(diff) % 2 === 0 ? 1 : -1;
+      if (!coeffs[mask]) coeffs[mask] = {};
+      coeffs[mask][x] = (coeffs[mask][x] || 0) + delta;
       if (!touched[mask]) touched[mask] = new Set();
       touched[mask].add(x);
     }
   }
 }
 
-function doApplyAction(x, S, T) {
-  applyDelta(x, S, T, +1);
-  actions.push({ x, S, T });
-  renderAll();
-}
-
 function doUndoAction(idx) {
-  const { x, S, T } = actions[idx];
-  applyDelta(x, S, T, -1);
   actions.splice(idx, 1);
-  rebuildTouched();   // recalculate which cells are still touched
+  recomputeAll();
   renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════
-//  SAVE / LOAD CODE
+//  PARSE HUMAN-READABLE ACTION TEXT
+// ═══════════════════════════════════════════════════════════
+// Accepts: "e: {de} → {abde}"  or  "e: de -> abde"  etc.
+function lettersToMask(str) {
+  let mask = 0;
+  for (const ch of (str || '').toLowerCase()) {
+    const idx = alts.indexOf(ch);
+    if (idx < 0) return -1;
+    mask |= (1 << idx);
+  }
+  return mask;
+}
+
+function parseActionText(text) {
+  text = text.trim().replace(/→/g, '->').replace(/\s+/g, ' ');
+  const m = text.match(/^([a-zA-Z])\s*:\s*\{?([a-zA-Z]*)\}?\s*->\s*\{?([a-zA-Z]*)\}?\s*$/);
+  if (!m) return null;
+
+  const x = alts.indexOf(m[1].toLowerCase());
+  if (x < 0) return null;
+
+  const S = lettersToMask(m[2]);
+  const T = lettersToMask(m[3]);
+
+  if (S < 0 || T < 0)          return null;
+  if (S < 1 || S >= (1 << N))  return null;
+  if (T < 1 || T >= (1 << N))  return null;
+  if (!(S & (1 << x)))          return null;  // x must be in S
+  if ((T & S) !== S || T === S) return null;  // T must properly contain S
+
+  return { x, S, T };
+}
+
+function actionToText(x, S, T) {
+  return `${alts[x]}: {${maskToStr(S)}} → {${maskToStr(T)}}`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SAVE / LOAD CODE  (only valid actions saved)
 // ═══════════════════════════════════════════════════════════
 // Format: "N|x:Shex-Thex|..."
 // Example: "4|a:1-7|a:3-f"
 
 function generateCode() {
   const parts = [`${N}`];
-  for (const { x, S, T } of actions) {
+  for (const action of actions) {
+    if (!action.parsed) continue;
+    const { x, S, T } = action.parsed;
     parts.push(`${alts[x]}:${S.toString(16)}-${T.toString(16)}`);
   }
   return parts.join('|');
@@ -595,10 +656,9 @@ function initGame(n, loadedActions) {
 
   if (loadedActions) {
     for (const a of loadedActions) {
-      applyDelta(a.x, a.S, a.T, +1);
-      actions.push(a);
+      actions.push({ raw: actionToText(a.x, a.S, a.T), parsed: a });
     }
-    rebuildTouched();
+    recomputeAll();
   }
 }
 
@@ -673,12 +733,12 @@ function handleTargetBoxClick(mask) {
 }
 
 function finishSelection(targetMask) {
-  const x = selLetter;
-  const S = selSource;
-  const T = targetMask;
+  const x = selLetter, S = selSource, T = targetMask;
   selLetter = null;
   selSource = null;
-  doApplyAction(x, S, T);
+  actions.push({ raw: actionToText(x, S, T), parsed: { x, S, T } });
+  recomputeAll();
+  renderAll();
 }
 
 function cancelSelection() {
@@ -800,30 +860,94 @@ function renderActionsList() {
   list.innerHTML = '';
 
   if (actions.length === 0) {
-    list.innerHTML = '<p class="no-actions-msg">No actions yet.</p>';
-    return;
+    const msg = document.createElement('p');
+    msg.className = 'no-actions-msg';
+    msg.textContent = 'No actions yet.';
+    list.appendChild(msg);
   }
 
-  // Show newest at top
-  for (let idx = actions.length - 1; idx >= 0; idx--) {
-    const { x, S, T } = actions[idx];
+  for (let idx = 0; idx < actions.length; idx++) {
+    const { raw, parsed } = actions[idx];
+    const hasError = !parsed && raw.trim() !== '';
+
     const item = document.createElement('div');
-    item.className = 'action-item';
+    item.className = 'action-item' + (hasError ? ' has-error' : '');
+    item.dataset.idx = idx;
 
-    const label = document.createElement('span');
-    label.className = 'action-label';
-    label.textContent = `${alts[x]}: {${maskToStr(S)}} → {${maskToStr(T)}}`;
+    const input = document.createElement('input');
+    input.type  = 'text';
+    input.className = 'action-input';
+    input.value = raw;
+    input.addEventListener('input', () => handleActionEdit(idx, input.value));
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); focusNewActionInput(); }
+    });
 
-    const undoBtn = document.createElement('button');
-    undoBtn.className = 'btn-danger';
-    undoBtn.textContent = '×';
-    undoBtn.title = 'Undo this action';
-    undoBtn.addEventListener('click', () => doUndoAction(idx));
+    const errIcon = document.createElement('span');
+    errIcon.className = 'action-error-icon';
+    errIcon.textContent = '⚠';
+    errIcon.title = 'Invalid — not applied to diagram';
 
-    item.appendChild(label);
-    item.appendChild(undoBtn);
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn-danger';
+    removeBtn.textContent = '×';
+    removeBtn.title = 'Remove this action';
+    removeBtn.addEventListener('click', () => doUndoAction(idx));
+
+    item.appendChild(input);
+    item.appendChild(errIcon);
+    item.appendChild(removeBtn);
     list.appendChild(item);
   }
+
+  // Always-present empty input row for adding new actions
+  const newWrap = document.createElement('div');
+  newWrap.className = 'new-action-row';
+  const newInput = document.createElement('input');
+  newInput.type = 'text';
+  newInput.id   = 'new-action-input';
+  newInput.className   = 'new-action-input';
+  newInput.placeholder = 'e.g.  a: {a} → {abc}';
+  newInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); handleNewActionSubmit(newInput); }
+  });
+  newInput.addEventListener('blur', () => {
+    if (newInput.value.trim()) handleNewActionSubmit(newInput);
+  });
+  newWrap.appendChild(newInput);
+  list.appendChild(newWrap);
+}
+
+// Live edit of an existing action — update only the error indicator, not the whole list
+function handleActionEdit(idx, newRaw) {
+  actions[idx].raw    = newRaw;
+  actions[idx].parsed = parseActionText(newRaw);
+
+  const item = document.querySelector(`.action-item[data-idx="${idx}"]`);
+  if (item) {
+    const hasError = !actions[idx].parsed && newRaw.trim() !== '';
+    item.classList.toggle('has-error', hasError);
+  }
+
+  recomputeAll();
+  renderHasse();
+  document.getElementById('save-code').value = generateCode();
+}
+
+// Submit the new-action input (Enter or blur)
+function handleNewActionSubmit(inputEl) {
+  const raw = inputEl.value.trim();
+  if (!raw) return;
+  actions.push({ raw, parsed: parseActionText(raw) });
+  recomputeAll();
+  renderAll();
+  const ni = document.getElementById('new-action-input');
+  if (ni) ni.focus();
+}
+
+function focusNewActionInput() {
+  const ni = document.getElementById('new-action-input');
+  if (ni) ni.focus();
 }
 
 // ─── Copy code button ────────────────────────────────────
