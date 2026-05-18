@@ -579,7 +579,7 @@ function isTouched(mask, li) {
 
 function isValidTarget(mask) {
   if (selLetter === null || selSource === null) return false;
-  return (mask & selSource) === selSource && mask !== selSource;
+  return (mask & selSource) === selSource; // S ⊆ T  (T = S is now allowed)
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -639,8 +639,8 @@ function parseActionText(text) {
   if (S < 0 || T < 0)          return null;
   if (S < 1 || S >= (1 << N))  return null;
   if (T < 1 || T >= (1 << N))  return null;
-  if (!(S & (1 << x)))          return null;  // x must be in S
-  if ((T & S) !== S || T === S) return null;  // T must properly contain S
+  if (!(S & (1 << x)))  return null;  // x must be in S
+  if ((T & S) !== S)    return null;  // S must be ⊆ T  (T = S allowed)
 
   return { x, S, T };
 }
@@ -686,8 +686,8 @@ function parseCode(raw) {
     if (x < 0 || x >= n)              return null;
     if (S < 1 || S >= (1 << n))       return null;
     if (T < 1 || T >= (1 << n))       return null;
-    if (!(S & (1 << x)))               return null;  // x must be in S
-    if ((T & S) !== S || T === S)      return null;  // T must properly contain S
+    if (!(S & (1 << x)))  return null;  // x must be in S
+    if ((T & S) !== S)    return null;  // S ⊆ T  (T = S allowed)
 
     parsed.push({ x, S, T });
   }
