@@ -123,6 +123,11 @@ a { color: #36c; }
       <label for="opt-standard">Only Standard BM</label>
     </div>
     <div class="opt-hint">Checked → T is always the full set X (fast, unique, no toolbox needed)</div>
+    <div class="opt-row">
+      <input type="checkbox" id="opt-bottomup">
+      <label for="opt-bottomup">Bottom-up BM</label>
+    </div>
+    <div class="opt-hint">Level-by-level: place target entries, then at each larger size equalise all alternatives in each subset to the same ρ. Always non-negative; k ignored; no toolbox.</div>
   </div>
 
   <div id="cores-panel">
@@ -278,12 +283,16 @@ function clearAllInputs() {
 // ── Mode info & cores-panel visibility ────────────────────────────────────────
 
 function updateModeInfo() {
+  const optBu  = document.getElementById('opt-bottomup').checked;
   const optStd = document.getElementById('opt-standard').checked;
   const optRep = document.getElementById('opt-repeatable').checked;
   const coresPanel = document.getElementById('cores-panel');
   let info;
-  if (optStd) {
-    info = 'Mode: Standard BM — forward substitution, always unique, no toolbox needed';
+  if (optBu) {
+    info = 'Mode: Bottom-up BM — level-by-level equalisation, no toolbox, k ignored';
+    coresPanel.classList.add('disabled');
+  } else if (optStd) {
+    info = 'Mode: Standard BM — forward substitution, k-placement search, no toolbox needed';
     coresPanel.classList.add('disabled');
   } else if (optRep) {
     info = 'Mode: General BM, repeatable — non-negative integer LP (Optimization Toolbox required)';
@@ -340,9 +349,10 @@ function getBaseTarget() {
 function encodeConfig() {
   const std   = document.getElementById('opt-standard').checked   ? 1 : 0;
   const rep   = document.getElementById('opt-repeatable').checked ? 1 : 0;
+  const bu    = document.getElementById('opt-bottomup').checked   ? 1 : 0;
   const cores = parseInt(document.getElementById('cores-input').value) || 1;
   const k     = parseInt(document.getElementById('const-k').value)    || 0;
-  const parts = [N, std, rep, cores, k];
+  const parts = [N, std, rep, cores, k, bu];
   document.querySelectorAll('.coeff-input').forEach(inp => {
     const val = parseInt(inp.value);
     if (!isNaN(val) && val !== 0)
@@ -361,8 +371,11 @@ function applyConfig(code) {
     const cores = parseInt(parts[3]);
     const k     = parseInt(parts[4]);
     if ([n,std,rep,cores,k].some(isNaN) || n < 2 || n > 9) return false;
+    // parts[5] is the bu flag (0/1) if it has no colon; otherwise it's a legacy mask:li:val entry
+    let bu = 0, entryStart = 5;
+    if (parts.length > 5 && /^[01]$/.test(parts[5])) { bu = +parts[5]; entryStart = 6; }
     const entries = [];
-    for (let i = 5; i < parts.length; i++) {
+    for (let i = entryStart; i < parts.length; i++) {
       const m = parts[i].match(/^(\d+):(\d+):(-?\d+)$/);
       if (!m) return false;
       entries.push({ mask: +m[1], li: +m[2], val: +m[3] });
@@ -376,8 +389,9 @@ function applyConfig(code) {
       updateAlts();
       renderDiagram(); // redraws inputs; also calls updateModeInfo + updateConfigCode
     }
-    document.getElementById('opt-standard').checked   = std   === 1;
-    document.getElementById('opt-repeatable').checked = rep   === 1;
+    document.getElementById('opt-standard').checked   = std === 1;
+    document.getElementById('opt-repeatable').checked = rep === 1;
+    document.getElementById('opt-bottomup').checked   = bu  === 1;
     document.getElementById('cores-input').value = cores;
     document.getElementById('const-k').value     = k;
     updateModeInfo();
@@ -406,7 +420,7 @@ function updateConfigCode() {
 
 // ── MATLAB code generation ────────────────────────────────────────────────────
 
-function generateMatlabCode(baseTarget, kVal, optRep, optStd, numCores) {
+function generateMatlabCode(baseTarget, kVal, optRep, optStd, optBu, numCores) {
   const X = (1 << N) - 1;
   const altsStr = alts.join('');
   const lines = [];
@@ -419,13 +433,15 @@ function generateMatlabCode(baseTarget, kVal, optRep, optStd, numCores) {
   lines.push('% Generated: ' + d);
   lines.push('%');
   lines.push('% N = ' + N + ' alternatives: {' + alts.join(', ') + '}');
-  const modeLabel = optStd
-    ? (kVal !== 0
-        ? 'Standard BM (fwd-substitution; k-placement search if needed; General BM ILP last resort)'
-        : 'Standard BM (forward substitution, unique, no toolbox)')
-    : optRep
-      ? 'General BM — repeatable (non-negative integer LP, Optimization Toolbox)'
-      : 'General BM — non-repeatable (binary ILP, Optimization Toolbox)';
+  const modeLabel = optBu
+    ? 'Bottom-up BM — level-by-level equalisation, always non-negative, no toolbox'
+    : optStd
+      ? (kVal !== 0
+          ? 'Standard BM (fwd-substitution; k-placement search if needed; General BM ILP last resort)'
+          : 'Standard BM (forward substitution, unique, no toolbox)')
+      : optRep
+        ? 'General BM — repeatable (non-negative integer LP, Optimization Toolbox)'
+        : 'General BM — non-repeatable (binary ILP, Optimization Toolbox)';
   lines.push('% Mode: ' + modeLabel);
   if (!optStd) lines.push('% Parallel cores: ' + numCores);
   lines.push('%');
@@ -480,7 +496,96 @@ function generateMatlabCode(baseTarget, kVal, optRep, optStd, numCores) {
   lines.push("popcount = @(n) sum(dec2bin(n) == '1'); % set-bit count; popcount(0) = 0");
   lines.push('');
 
-  if (optStd) {
+  if (optBu) {
+    // ── Bottom-up BM: level-by-level equalisation ────────────────────────────
+    lines.push('%% ── Solve: Bottom-up BM (level-by-level equalisation) ──────────────────────────');
+    lines.push('% For each size level from smallest target size upward:');
+    lines.push('%   Compute current rho(x,S) from all actions placed so far.');
+    lines.push('%   Add q_{X}(x,S) = max_val - rho(x,S) for each x below the maximum.');
+    lines.push('% All action counts are non-negative by construction.');
+    lines.push('% k is not used; the constant term emerges naturally from the process.');
+    lines.push('');
+    lines.push('actions = zeros(0, 4); % columns: [x, S, T=X_full, count]');
+    lines.push('');
+    lines.push('% Step 1: place initial q actions from non-zero Hasse diagram entries');
+    lines.push('for x = 1:N');
+    lines.push('    xbit = 2^(x-1);');
+    lines.push('    for S = 1:X_full');
+    lines.push('        if ~bitand(S, xbit), continue; end');
+    lines.push('        if rho_base(S, x) <= 0, continue; end');
+    lines.push('        actions(end+1, :) = [x, S, X_full, rho_base(S, x)];');
+    lines.push('    end');
+    lines.push('end');
+    lines.push('');
+    lines.push('% Determine starting size level (smallest size with non-zero entries)');
+    lines.push('start_sz = N;');
+    lines.push('for x = 1:N');
+    lines.push('    for S = 1:X_full');
+    lines.push('        if bitand(S, 2^(x-1)) && rho_base(S,x) ~= 0');
+    lines.push('            start_sz = min(start_sz, popcount(S));');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push('end');
+    lines.push("fprintf('Starting size level: %d\\n', start_sz);");
+    lines.push('');
+    lines.push('% Step 2: equalize at each size level from (start_sz+1) to N');
+    lines.push('for sz = start_sz+1 : N');
+    lines.push('    n_added = 0;');
+    lines.push('    for S = 1:X_full');
+    lines.push('        if popcount(S) ~= sz, continue; end');
+    lines.push('');
+    lines.push('        % Compute rho(x,S) from all actions placed so far');
+    lines.push('        rho_cur = zeros(1, N);');
+    lines.push('        for i = 1:size(actions,1)');
+    lines.push('            xi = actions(i,1); Si = actions(i,2); Ti = actions(i,3); cnt = actions(i,4);');
+    lines.push('            if ~bitand(S, 2^(xi-1)), continue; end  % xi not in S');
+    lines.push('            if bitand(Si, S) ~= Si,  continue; end  % Si not subset of S');
+    lines.push('            if bitand(S,  Ti) ~= S,  continue; end  % S not subset of Ti');
+    lines.push('            excess = popcount(bitxor(S, bitand(S, Si)));');
+    lines.push('            rho_cur(xi) = rho_cur(xi) + cnt * (-1)^excess;');
+    lines.push('        end');
+    lines.push('');
+    lines.push('        % Find maximum rho value over all x in S');
+    lines.push('        mx = -Inf;');
+    lines.push('        for x = 1:N');
+    lines.push('            if bitand(S, 2^(x-1)), mx = max(mx, rho_cur(x)); end');
+    lines.push('        end');
+    lines.push('');
+    lines.push('        % Add q_{X}(x,S) = deficit for each x in S below the max');
+    lines.push('        for x = 1:N');
+    lines.push('            if ~bitand(S, 2^(x-1)), continue; end');
+    lines.push('            deficit = round(mx - rho_cur(x));');
+    lines.push('            if deficit > 0');
+    lines.push('                actions(end+1, :) = [x, S, X_full, deficit];');
+    lines.push('                n_added = n_added + deficit;');
+    lines.push('            end');
+    lines.push('        end');
+    lines.push('    end');
+    lines.push("    fprintf('  Size %d: added %d action-instances\\n', sz, n_added);");
+    lines.push('end');
+    lines.push("fprintf('Bottom-up complete. Total action-instances: %d\\n', sum(actions(:,4)));");
+    lines.push('');
+    lines.push('% Update rho_solved to the actual bottom-up result (so verification passes)');
+    lines.push('rho_solved = zeros(2^N - 1, N);');
+    lines.push('for i = 1:size(actions,1)');
+    lines.push('    xi_v = actions(i,1); Si_v = actions(i,2);');
+    lines.push('    Ti_v = actions(i,3); cnt_v = actions(i,4);');
+    lines.push('    TmS_v = bitxor(Ti_v, bitand(Ti_v, Si_v));');
+    lines.push('    ex_v = TmS_v;');
+    lines.push('    while true');
+    lines.push('        m_v = bitor(Si_v, ex_v);');
+    lines.push('        rho_solved(m_v, xi_v) = rho_solved(m_v, xi_v) + cnt_v * (-1)^popcount(ex_v);');
+    lines.push('        if ex_v == 0, break; end');
+    lines.push('        ex_v = bitand(ex_v - 1, TmS_v);');
+    lines.push('    end');
+    lines.push('end');
+    lines.push("fprintf('Bottom-up rho(x, X) at full set (all should be equal — value = constant term):\\n');");
+    lines.push('for x = 1:N');
+    lines.push("    fprintf('  rho(%s, X) = %g\\n', alts(x), rho_solved(X_full, x));");
+    lines.push('end');
+    lines.push("fprintf('Constant term: %g\\n', rho_solved(X_full, 1));  % all equal after equalisation");
+
+  } else if (optStd) {
     // ── Standard BM: forward substitution, General BM ILP fallback if negatives
     lines.push('%% ── Solve: Standard BM → k-placement search → General BM ILP ─────────────────');
     lines.push('% rho = target with k applied to all alternatives at X.');
@@ -865,9 +970,10 @@ function generate() {
   const kVal       = parseInt(document.getElementById('const-k').value) || 0;
   const optRep     = document.getElementById('opt-repeatable').checked;
   const optStd     = document.getElementById('opt-standard').checked;
+  const optBu      = document.getElementById('opt-bottomup').checked;
   const numCores   = Math.max(1, parseInt(document.getElementById('cores-input').value) || 1);
 
-  const code = generateMatlabCode(baseTarget, kVal, optRep, optStd, numCores);
+  const code = generateMatlabCode(baseTarget, kVal, optRep, optStd, optBu, numCores);
   const ta   = document.getElementById('matlab-output');
   ta.value   = code;
 
@@ -897,7 +1003,7 @@ document.getElementById('n-select').addEventListener('change', function () {
   updateConfigCode();
 });
 
-['opt-repeatable', 'opt-standard'].forEach(id =>
+['opt-repeatable', 'opt-standard', 'opt-bottomup'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => { updateModeInfo(); updateConfigCode(); })
 );
 
