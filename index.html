@@ -333,18 +333,20 @@
   <div class="sidebar-panel" id="latex-panel">
     <div class="panel-header">
       <h4>LaTeX in BM</h4>
+      <button class="btn-copy-sm" id="btn-copy-latex" onclick="copyPanel('latex-code','btn-copy-latex','Copy','✓')">Copy</button>
       <button class="btn-expand" id="btn-expand-bm" onclick="toggleExpandBM()" title="Expand below diagram">⤢</button>
     </div>
     <textarea id="latex-code" class="panel-textarea" readonly></textarea>
-    <button class="btn-copy" id="btn-copy-latex" onclick="copyPanel('latex-code','btn-copy-latex','Copy','✓ Copied!')">Copy</button>
   </div>
 
   <!-- Save Code (editable) -->
   <div class="sidebar-panel" id="code-panel">
-    <h4>Save Code</h4>
+    <div class="panel-header">
+      <h4>Save Code</h4>
+      <button class="btn-copy-sm" id="btn-copy-code" onclick="copyPanel('save-code','btn-copy-code','Copy','✓')">Copy</button>
+    </div>
     <textarea id="save-code" class="panel-textarea" placeholder="Paste a save code here to load it…"></textarea>
     <div id="save-code-status"></div>
-    <button class="btn-copy" id="btn-copy-code" onclick="copyPanel('save-code','btn-copy-code','Copy All','✓ Copied!')">Copy All</button>
   </div>
 </div>
 
