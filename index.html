@@ -260,6 +260,8 @@
     }
     .btn-copy-sm:hover { background: #3869aa; }
     .btn-copy-sm.copied { background: #2a8a5a; }
+    #btn-copy-config:hover { background: #4d7040 !important; }
+    #btn-copy-config.copied { background: #2a8a5a !important; }
   </style>
 </head>
 <body>
@@ -325,6 +327,7 @@
     <div class="panel-header">
       <h4>LaTeX in Choice</h4>
       <button class="btn-copy-sm" id="btn-copy-choice" onclick="copyPanel('choice-code','btn-copy-choice','Copy','✓')">Copy</button>
+      <button class="btn-copy-sm" id="btn-copy-config" style="background:#6a8f5a;" onclick="copyConfigCode()">Config Code</button>
     </div>
     <textarea id="choice-code" class="panel-textarea" readonly></textarea>
   </div>
@@ -944,6 +947,36 @@ function handleSaveCodeInput() {
     ta.value = generateCode();
     _updatingCode = false;
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GENERATE CONFIG CODE (for matlabsolver)
+//  Format: N|std|rep|cores|k[|mask:li:val]*
+//  Default options: std=1, rep=1, cores=1, k=0
+// ═══════════════════════════════════════════════════════════
+function generateConfigCode() {
+  const parts = [N, 1, 1, 1, 0];
+  for (let mask = 1; mask < (1 << N); mask++) {
+    for (const li of maskLetterIndices(mask)) {
+      const val = getCoeff(mask, li);
+      if (val !== 0) parts.push(`${mask}:${li}:${val}`);
+    }
+  }
+  return parts.join('|');
+}
+
+function copyConfigCode() {
+  const text = generateConfigCode();
+  const btn  = document.getElementById('btn-copy-config');
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.textContent = '✓';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
 }
 
 // ═══════════════════════════════════════════════════════════
