@@ -142,8 +142,8 @@
     .coeff-neg  { color: #8b1a1a; }
     .coeff-zero { color: #111; }
 
-    /* hover-preview: show would-be result dimmed + italic */
-    .coeff-cell.coeff-preview           { opacity: 0.42; font-style: italic; }
+    /* hover-preview: show would-be result dimmed */
+    .coeff-cell.coeff-preview           { opacity: 0.42; }
     .coeff-cell.coeff-preview.coeff-pos { color: #2178b4; }
     .coeff-cell.coeff-preview.coeff-neg { color: #8b1a1a; }
     .coeff-cell.coeff-preview.coeff-zero{ color: #555; }
@@ -153,11 +153,9 @@
       border-radius: 4px; cursor: pointer; user-select: none;
       line-height: 1.35; transition: color 0.1s; color: #222;
     }
-    .letter-cell:hover     { color: #d07000; font-weight: bold; font-style: italic; }
-    .letter-cell.is-active { color: #d07000; font-weight: bold; font-style: italic; }
-    #hasse.selecting-mode .letter-cell:hover:not(.is-active) {
-      color: #222; font-weight: normal; font-style: normal;
-    }
+    .letter-cell:hover     { color: #d07000; }
+    .letter-cell.is-active { color: #d07000; }
+    #hasse.selecting-mode .letter-cell:hover:not(.is-active) { color: #222; }
 
     /* ─── SIDEBAR ─────────────────────────────────────────── */
     #sidebar {
@@ -260,8 +258,8 @@
     }
     .btn-copy-sm:hover { background: #3869aa; }
     .btn-copy-sm.copied { background: #2a8a5a; }
-    #btn-copy-config:hover { background: #4d7040 !important; }
-    #btn-copy-config.copied { background: #2a8a5a !important; }
+    #btn-copy-config:hover, #btn-copy-config-simp:hover { background: #4d7040 !important; }
+    #btn-copy-config.copied, #btn-copy-config-simp.copied { background: #2a8a5a !important; }
   </style>
 </head>
 <body>
@@ -293,7 +291,7 @@
   <!-- Expanded BM LaTeX panel — shown below the diagram when expanded -->
   <div id="bm-expanded" style="display:none">
     <div id="bm-expanded-header">
-      <strong>LaTeX in BM — expanded</strong>
+      <strong>BMC — expanded</strong>
       <div class="sort-options">
         <label>
           <input type="radio" name="bm-sort" value="alpha" checked onchange="renderBMLatex()">
@@ -322,20 +320,21 @@
     </div>
   </div>
 
-  <!-- LaTeX in Choice -->
+  <!-- Choice -->
   <div class="sidebar-panel" id="choice-panel">
     <div class="panel-header">
-      <h4>LaTeX in Choice</h4>
+      <h4>Choice</h4>
       <button class="btn-copy-sm" id="btn-copy-choice" onclick="copyPanel('choice-code','btn-copy-choice','Copy','✓')">Copy</button>
-      <button class="btn-copy-sm" id="btn-copy-config" style="background:#6a8f5a;" onclick="copyConfigCode()">Config Code</button>
+      <button class="btn-copy-sm" id="btn-copy-config" style="background:#6a8f5a;" onclick="copyConfigCode()">Config As Is</button>
+      <button class="btn-copy-sm" id="btn-copy-config-simp" style="background:#6a8f5a;" onclick="copyConfigSimpCode()">Config Simp</button>
     </div>
     <textarea id="choice-code" class="panel-textarea" readonly></textarea>
   </div>
 
-  <!-- LaTeX in BM -->
+  <!-- BMC -->
   <div class="sidebar-panel" id="latex-panel">
     <div class="panel-header">
-      <h4>LaTeX in BM</h4>
+      <h4>BMC</h4>
       <button class="btn-copy-sm" id="btn-copy-latex" onclick="copyPanel('latex-code','btn-copy-latex','Copy','✓')">Copy</button>
       <button class="btn-expand" id="btn-expand-bm" onclick="toggleExpandBM()" title="Expand below diagram">⤢</button>
     </div>
@@ -804,7 +803,7 @@ function makeBoxEl(mask) {
     letter.className = 'letter-cell';
     letter.textContent = alts[li];
     if (selLetter === li && selSource === mask) letter.classList.add('is-active');
-    letter.addEventListener('click', e => { e.stopPropagation(); handleLetterClick(mask, li, e.ctrlKey); });
+    letter.addEventListener('click', e => { e.stopPropagation(); handleLetterClick(mask, li, e.ctrlKey || e.metaKey); });
 
     col.appendChild(coeff);
     col.appendChild(letter);
@@ -968,6 +967,46 @@ function generateConfigCode() {
 function copyConfigCode() {
   const text = generateConfigCode();
   const btn  = document.getElementById('btn-copy-config');
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.textContent = '✓';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GENERATE CONFIG SIMP CODE (for matlabsolver)
+//  Same format as Config As Is but applies Σ_x ρ(x,S)=1
+//  identity per set: residual coefficients + constant k.
+// ═══════════════════════════════════════════════════════════
+function generateConfigSimpCode() {
+  let constant = 0;
+  const residuals = [];
+  for (let mask = 1; mask < (1 << N); mask++) {
+    const letters = maskLetterIndices(mask);
+    if (!letters.length) continue;
+    const c = {};
+    for (const li of letters) c[li] = getCoeff(mask, li);
+    const minC = Math.min(...letters.map(li => c[li]));
+    if (minC !== 0) {
+      constant += minC;
+      for (const li of letters) c[li] -= minC;
+    }
+    for (const li of letters)
+      if (c[li] !== 0) residuals.push({ mask, li, val: c[li] });
+  }
+  const parts = [N, 1, 1, 1, constant];
+  for (const { mask, li, val } of residuals) parts.push(`${mask}:${li}:${val}`);
+  return parts.join('|');
+}
+
+function copyConfigSimpCode() {
+  const text = generateConfigSimpCode();
+  const btn  = document.getElementById('btn-copy-config-simp');
   navigator.clipboard.writeText(text).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta);
