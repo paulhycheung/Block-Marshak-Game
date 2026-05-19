@@ -409,7 +409,7 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
   const kVal = parseInt(document.getElementById('const-k').value) || 0;
   const modeLabel = optStd
     ? (kVal !== 0
-        ? 'Standard BM (tries fwd-substitution first; auto-falls back to T=X ILP if negatives)'
+        ? 'Standard BM (fwd-substitution first; auto-falls back to General BM ILP if negatives)'
         : 'Standard BM (forward substitution, unique, no toolbox)')
     : optRep
       ? 'General BM — repeatable (non-negative integer LP, Optimization Toolbox)'
@@ -458,9 +458,12 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
   lines.push('');
 
   if (optStd) {
-    // ── Standard BM: forward substitution, auto-ILP fallback if negatives ────
-    lines.push('%% ── Solve: Standard BM (auto-fallback to T=X ILP if negatives detected) ─────');
+    // ── Standard BM: forward substitution, General BM ILP fallback if negatives
+    lines.push('%% ── Solve: Standard BM (auto-fallback to General BM ILP if negatives detected) ─');
     lines.push('% rho already contains the full target including any constant k.');
+    lines.push('% Note: if Standard BM has any negative coefficient, it means NO non-negative');
+    lines.push('% T=X decomposition exists (Standard BM gives the UNIQUE T=X solution).');
+    lines.push('% The fallback therefore allows T to be any valid superset of S (General BM).');
     lines.push('X_full = 2^N - 1;');
     lines.push('');
     lines.push('coeff_std = stdBM(rho, N);');
@@ -477,21 +480,24 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
     lines.push('    end');
     lines.push('else');
     lines.push("    fprintf('Standard BM has %d negative coefficient(s).\\n', sum(coeff_std(:) < 0));");
-    lines.push("    fprintf('Running ILP (T = X_full, non-negative integer) on the same target...\\n');");
-    lines.push('    % Enumerate all Standard-BM-style actions: q_X(x,S) for every x∈S');
-    lines.push('    ilp_x = [];');
-    lines.push('    ilp_S = [];');
+    lines.push("    fprintf('No non-negative T=X solution exists; running General BM ILP (T free)...\\n');");
+    lines.push('');
+    lines.push('    % Enumerate all valid BM actions: (x, S, T) with x∈S⊆T⊆X');
+    lines.push('    ilp_x = []; ilp_S = []; ilp_T = [];');
     lines.push('    for x = 1:N');
     lines.push('        xbit = 2^(x - 1);');
     lines.push('        for S = 1:(2^N - 1)');
-    lines.push('            if bitand(S, xbit)');
+    lines.push('            if ~bitand(S, xbit), continue; end');
+    lines.push('            for T = S:(2^N - 1)');
+    lines.push('                if bitand(T, S) ~= S, continue; end');
     lines.push('                ilp_x(end + 1) = x;');
     lines.push('                ilp_S(end + 1) = S;');
+    lines.push('                ilp_T(end + 1) = T;');
     lines.push('            end');
     lines.push('        end');
     lines.push('    end');
     lines.push('    m_ilp = length(ilp_x);');
-    lines.push("    fprintf('Candidate actions (T=X): %d\\n', m_ilp);");
+    lines.push("    fprintf('Candidate BM actions (T free): %d\\n', m_ilp);");
     lines.push('');
     lines.push('    % Row index map (mask, x) → equation row');
     lines.push('    row_idx  = zeros(2^N - 1, N);');
@@ -513,8 +519,8 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
     lines.push('        end');
     lines.push('    end');
     lines.push('    for j = 1:m_ilp');
-    lines.push('        xj = ilp_x(j); Sj = ilp_S(j);');
-    lines.push('        TmS = bitxor(X_full, bitand(X_full, Sj)); extra = TmS;');
+    lines.push('        xj = ilp_x(j); Sj = ilp_S(j); Tj = ilp_T(j);');
+    lines.push('        TmS = bitxor(Tj, bitand(Tj, Sj)); extra = TmS;');
     lines.push('        while true');
     lines.push('            mk = bitor(Sj, extra);');
     lines.push('            A_eq(row_idx(mk, xj), j) = (-1)^popcount(extra);');
@@ -524,18 +530,20 @@ function generateMatlabCode(target, optRep, optStd, numCores) {
     lines.push('    end');
     lines.push('');
     lines.push("    options_ilp = optimoptions('intlinprog', 'Display', 'iter');");
+    if (numCores > 1) {
+      lines.push('    % intlinprog automatically uses the open parallel pool for branch-and-bound.');
+    }
     lines.push('    [c_sol, ~, exitflag, ~] = intlinprog(zeros(m_ilp,1), 1:m_ilp, [], [], A_eq, b_eq, zeros(m_ilp,1), [], options_ilp);');
     lines.push('    if isempty(c_sol) || exitflag <= 0');
-    lines.push("        fprintf('\\nILP found no non-negative T=X solution (exitflag=%d).\\n', exitflag);");
-    lines.push("        fprintf('The target has no non-negative Standard-BM decomposition.\\n');");
-    lines.push("        fprintf('Switch to General BM mode (allow T ≠ X) for a solution.\\n');");
+    lines.push("        fprintf('\\nGeneral BM ILP found no solution (exitflag=%d).\\n', exitflag);");
+    lines.push("        fprintf('The target polynomial has no non-negative BM decomposition.\\n');");
     lines.push('        return;');
     lines.push('    end');
     lines.push('    c_sol = round(c_sol);');
     lines.push('    actions = zeros(0, 4);');
     lines.push('    for j = 1:m_ilp');
     lines.push('        if c_sol(j) > 0');
-    lines.push('            actions(end + 1, :) = [ilp_x(j), ilp_S(j), X_full, c_sol(j)];');
+    lines.push('            actions(end + 1, :) = [ilp_x(j), ilp_S(j), ilp_T(j), c_sol(j)];');
     lines.push('        end');
     lines.push('    end');
     lines.push('end');
