@@ -308,7 +308,6 @@
       transition: all 0.12s; white-space: nowrap;
     }
     .mode-badge:hover { border-color: #4a7bbd; color: #4a7bbd; }
-    #bm-mode-btn { font-size: 0.78rem; padding: 0.2rem 0.65rem; border-color: #888; }
   </style>
 </head>
 <body>
@@ -325,8 +324,8 @@
         <option value="8">8</option><option value="9">9</option>
       </select>
     </div>
-    <button id="bm-mode-btn" class="mode-badge" onclick="toggleBMMode()" title="Toggle Standard / Interim BM mode">Standard BM</button>
-    <h2 id="diagram-title"></h2>
+    <button class="disp-btn active" id="mode-std" onclick="setBMMode('standard')">Standard BM</button>
+    <button class="disp-btn" id="mode-int" onclick="setBMMode('interim')">Interim BM</button>
     <div id="right-bar"></div>
   </div>
 
@@ -530,7 +529,7 @@ function isBoxMatched(mask){
   return true;
 }
 function checkAllMatched(){
-  if(!targetActive)return false;
+  if(!targetActive||targetEditMode)return false;
   for(let m=1;m<(1<<N);m++)
     for(const li of maskLetterIndices(m))
       if(dispCoeff(m,li)!==dispTargetCoeff(m,li))return false;
@@ -756,11 +755,10 @@ function clearAllActions(){
   actions=[];recomputeAll();renderAll();
 }
 
-function toggleBMMode(){
-  bmMode=bmMode==='standard'?'interim':'standard';
-  const btn=document.getElementById('bm-mode-btn');
-  if(btn)btn.textContent=bmMode==='standard'?'Standard BM':'Interim BM';
-  // Cancel any pending selection when switching modes
+function setBMMode(mode){
+  bmMode=mode;
+  document.getElementById('mode-std').classList.toggle('active',mode==='standard');
+  document.getElementById('mode-int').classList.toggle('active',mode==='interim');
   selLetter=null;selSource=null;renderAll();
 }
 
@@ -831,7 +829,6 @@ function initGame(n,loadedActions){
   }
 }
 function updateTitle(){
-  document.getElementById('diagram-title').textContent=`alternatives: { ${alts.join(', ')} }`;
   document.getElementById('n-selector').value=String(N);
 }
 function handleNChange(val){
