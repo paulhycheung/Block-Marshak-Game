@@ -113,7 +113,7 @@
       padding: 3px 14px 4px; gap: 1px; min-width: 72px;
     }
     .constant-current { font-size: 1rem; font-weight: bold; color: #333; min-height: 1.1em; line-height: 1; }
-    .constant-current.unmatched { color: #c0392b; }
+    .constant-label.unmatched { color: #c0392b; font-weight: bold; }
     .constant-label { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
     .constant-target { font-size: 0.85rem; color: #888; font-style: italic; min-height: 1em; line-height: 1; }
     .constant-k-input {
@@ -849,7 +849,7 @@ function clearHoverPreview(){
     const parts=el.id.split('-');const mask=+parts[1],li=+parts[2];
     const val=dispCoeff(mask,li);
     el.className='coeff-cell';
-    if(isTouched(mask,li)){
+    if(isTouched(mask,li)||val!==0){
       el.textContent=String(val);
       if(val>0)el.classList.add('coeff-pos');
       else if(val<0)el.classList.add('coeff-neg');
@@ -1011,7 +1011,7 @@ function renderHasse(){
         box.appendChild(kInput);
       } else {
         const tgtConst=targetConstant();
-        if(curConst!==tgtConst)curEl.classList.add('unmatched');
+        if(curConst!==tgtConst)lblEl.classList.add('unmatched');
         const tgtEl=document.createElement('div');tgtEl.className='constant-target';
         tgtEl.textContent=String(tgtConst);
         box.appendChild(tgtEl);
@@ -1047,7 +1047,7 @@ function makeBoxEl(mask){
     const coeff=document.createElement('span');
     coeff.className='coeff-cell';coeff.id=`cc-${mask}-${li}`;
     const val=dispCoeff(mask,li);
-    if(isTouched(mask,li)){
+    if(isTouched(mask,li)||val!==0){
       coeff.textContent=String(val);
       if(val>0)coeff.classList.add('coeff-pos');
       else if(val<0)coeff.classList.add('coeff-neg');
