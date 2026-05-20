@@ -6,24 +6,15 @@
   <title>Block-Marshak Matching</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: 'Georgia', serif;
       background: #f0ede8;
-      height: 100vh;
-      overflow: hidden;
-      color: #222;
-      display: flex;
-      flex-direction: row;
+      height: 100vh; overflow: hidden; color: #222;
+      display: flex; flex-direction: row;
     }
-
     button {
-      padding: 0.45rem 1.1rem;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
-      font-size: 0.88rem;
-      font-family: inherit;
+      padding: 0.45rem 1.1rem; border: none; border-radius: 7px;
+      cursor: pointer; font-size: 0.88rem; font-family: inherit;
       transition: background 0.15s, transform 0.08s;
     }
     button:active { transform: scale(0.96); }
@@ -39,63 +30,74 @@
     }
     .btn-danger:hover { background: #c0392b; color: white; }
 
+    /* ── Diagram area ── */
     #diagram-area {
-      flex: 1;
-      min-width: 0;
-      overflow: auto;
-      display: flex;
-      flex-direction: column;
-      padding: 1rem 1.2rem;
-      gap: 0.6rem;
+      flex: 1; min-width: 0; overflow: auto;
+      display: flex; flex-direction: column;
+      padding: 0.8rem 1.2rem; gap: 0.5rem;
     }
-
     .diagram-topbar {
-      display: flex;
-      align-items: center;
-      gap: 0.9rem;
-      flex-shrink: 0;
-      flex-wrap: wrap;
+      display: flex; align-items: center; gap: 0.9rem;
+      flex-shrink: 0; flex-wrap: wrap;
     }
-
     .n-selector-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      font-size: 0.88rem;
-      color: #555;
+      display: flex; align-items: center; gap: 0.35rem;
+      font-size: 0.88rem; color: #555;
     }
     .n-selector-wrap select {
-      font-size: 0.88rem;
-      font-family: 'Georgia', serif;
-      border: 1.5px solid #ccc;
-      border-radius: 6px;
-      padding: 0.22rem 0.45rem;
-      background: white;
-      cursor: pointer;
+      font-size: 0.88rem; font-family: 'Georgia', serif;
+      border: 1.5px solid #ccc; border-radius: 6px;
+      padding: 0.22rem 0.45rem; background: white; cursor: pointer;
     }
     .n-selector-wrap select:focus { outline: none; border-color: #4a7bbd; }
-
     #diagram-title { font-size: 1rem; color: #555; font-weight: normal; }
-    #hint-bar { font-size: 0.82rem; color: #888; font-style: italic; margin-left: auto; }
-    #hint-bar.selecting { color: #c06000; font-style: normal; font-weight: bold; }
 
-    /* ── Target area ── */
-    #target-area { display: flex; align-items: center; gap: 0.35rem; }
-    #target-input {
-      width: 240px; padding: 0.22rem 0.5rem;
-      font-size: 0.79rem; font-family: monospace;
+    /* ── Right bar (Set Target / hint) ── */
+    #right-bar { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+    .btn-set-target {
+      background: #4a7bbd; color: white;
+      padding: 0.32rem 1rem; font-size: 0.85rem; border-radius: 7px;
+      border: none; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-set-target:hover { background: #3869aa; }
+    .target-set-badge {
+      font-size: 0.8rem; color: #2a7a3a; font-weight: bold;
+      background: #e8f8ed; border: 1.5px solid #2a7a3a;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    .hint-selecting { font-size: 0.82rem; color: #c06000; font-weight: bold; }
+
+    /* ── Target edit bar (below topbar) ── */
+    #target-edit-bar {
+      display: none; flex-shrink: 0;
+      background: #fffdf5; border: 1.5px solid #f0d090;
+      border-radius: 8px; padding: 0.5rem 0.75rem;
+      display: none; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    }
+    #target-edit-bar.visible { display: flex; }
+    #target-paste-input {
+      flex: 1; min-width: 200px;
+      padding: 0.25rem 0.55rem; font-size: 0.79rem; font-family: monospace;
       border: 1.5px solid #ccc; border-radius: 6px; background: white;
     }
-    #target-input:focus { outline: none; border-color: #4a7bbd; }
-    #target-input.parse-ok  { border-color: #2a7a3a; background: #f0fff0; }
-    #target-input.parse-err { border-color: #c0392b; background: #fff5f5; }
+    #target-paste-input:focus { outline: none; border-color: #4a7bbd; }
+    #target-paste-input.parse-ok  { border-color: #2a7a3a; background: #f0fff0; }
+    #target-paste-input.parse-err { border-color: #c0392b; background: #fff5f5; }
+    #target-paste-status { font-size: 0.76rem; }
 
-    /* ── Simplified toggle bar ── */
-    #simplified-bar {
-      display: flex; align-items: center; gap: 0.6rem;
+    /* ── Display mode bar ── */
+    #disp-mode-bar {
+      display: flex; align-items: center; gap: 0.5rem;
       font-size: 0.8rem; color: #666; flex-shrink: 0;
     }
-    #simplified-bar label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    #disp-mode-bar span { color: #999; }
+    .disp-btn {
+      font-size: 0.75rem; padding: 0.15rem 0.55rem;
+      border: 1.5px solid #ccc; border-radius: 5px;
+      background: white; color: #666; cursor: pointer; transition: all 0.12s;
+    }
+    .disp-btn.active { border-color: #4a7bbd; background: #4a7bbd; color: white; }
+    .disp-btn:hover:not(.active) { border-color: #999; background: #f0f0f0; }
 
     /* ── Hasse ── */
     #hasse {
@@ -115,20 +117,26 @@
     .constant-current { font-size: 1rem; font-weight: bold; color: #333; min-height: 1.1em; line-height: 1; }
     .constant-label { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
     .constant-target { font-size: 0.85rem; color: #888; font-style: italic; min-height: 1em; line-height: 1; }
+    .constant-k-input {
+      width: 46px; height: 20px; font-size: 0.78rem; text-align: center;
+      border: 1px solid #bbb; border-radius: 3px; padding: 0 3px;
+      font-family: monospace;
+    }
+    .constant-k-input:focus { outline: none; border-color: #4a7bbd; }
 
-    /* ── Expanded BM panel ── */
-    #bm-expanded {
+    /* ── Expanded panels ── */
+    .expanded-panel {
       border-top: 2px solid #e4e0d8; background: white;
       border-radius: 8px 8px 0 0; padding: 0.7rem 1rem 0.8rem; flex-shrink: 0;
     }
-    #bm-expanded-header {
+    .expanded-panel-header {
       display: flex; align-items: center; gap: 1rem;
       margin-bottom: 0.55rem; flex-wrap: wrap;
     }
-    #bm-expanded-header strong { font-size: 0.85rem; color: #555; }
-    .sort-options { display: flex; gap: 1rem; font-size: 0.8rem; color: #555; }
-    .sort-options label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
-    #latex-code-expanded {
+    .expanded-panel-header strong { font-size: 0.85rem; color: #555; }
+    .mode-options { display: flex; gap: 0.8rem; font-size: 0.8rem; color: #555; }
+    .mode-options label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    .expanded-textarea {
       width: 100%; height: 78px; font-family: monospace; font-size: 0.73rem;
       border: 1.5px solid #ddd; border-radius: 7px;
       padding: 0.4rem 0.5rem; resize: vertical;
@@ -145,23 +153,20 @@
     .subset-box.is-source { border-color: #4a7bbd; background: #f0f5ff; box-shadow: 0 0 0 3px rgba(74,123,189,0.18); }
     .subset-box.is-target { border-color: #d07000; background: #fff9f0; box-shadow: 0 0 10px rgba(208,112,0,0.25); cursor: pointer; }
     .subset-box.is-target:hover { background: #fff2d8; box-shadow: 0 0 14px rgba(208,112,0,0.40); }
-
     .letter-cols { display: flex; }
     .letter-col  { display: flex; flex-direction: column; align-items: center; }
-
     .coeff-cell {
       font-size: 1rem; font-weight: bold; text-align: center; line-height: 1;
       user-select: none; pointer-events: none;
       min-width: 0.6rem; padding: 0 1px; min-height: 1.1em;
     }
-    .coeff-pos   { color: #2178b4; }
-    .coeff-neg   { color: #8b1a1a; }
-    .coeff-zero  { color: #111; }
+    .coeff-pos  { color: #2178b4; }
+    .coeff-neg  { color: #8b1a1a; }
+    .coeff-zero { color: #111; }
     .coeff-cell.coeff-preview           { opacity: 0.42; }
     .coeff-cell.coeff-preview.coeff-pos { color: #2178b4; }
     .coeff-cell.coeff-preview.coeff-neg { color: #8b1a1a; }
     .coeff-cell.coeff-preview.coeff-zero{ color: #555; }
-
     .letter-cell {
       text-align: center; font-size: 1rem; padding: 1px 1px;
       border-radius: 4px; cursor: pointer; user-select: none;
@@ -180,17 +185,16 @@
     }
     .target-cell.has-target { color: #777; }
     .target-input-cell {
-      width: 28px; height: 18px;
-      font-size: 0.72rem; text-align: center;
+      width: 28px; height: 18px; font-size: 0.72rem; text-align: center;
       border: 1px solid #bbb; border-radius: 3px;
-      padding: 0 2px; background: #f9f9f9;
-      font-family: monospace; pointer-events: all;
+      padding: 0 2px; background: #f9f9f9; font-family: monospace;
+      pointer-events: all;
     }
     .target-input-cell:focus { outline: none; border-color: #4a7bbd; background: white; }
 
     /* ── Congratulations ── */
     #congrats {
-      display: none; text-align: center; padding: 0.6rem 1rem;
+      display: none; text-align: center; padding: 0.55rem 1rem;
       font-size: 1rem; color: #2a7a3a; font-weight: bold;
       background: #f0fff0; border-radius: 8px;
       border: 2px solid #2a7a3a; flex-shrink: 0;
@@ -235,20 +239,19 @@
     }
     .new-action-input:focus { outline: none; border-color: #4a7bbd; border-style: solid; background: white; color: #333; }
     .no-actions-msg { color: #bbb; font-size: 0.85rem; font-style: italic; }
-
     .sidebar-panel {
       padding: 0.65rem 1rem; border-top: 2px solid #e4e0d8;
       display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0;
     }
-    .panel-header { display: flex; align-items: center; justify-content: space-between; }
-    .panel-header h4 { font-size: 0.85rem; color: #666; }
+    .panel-header { display: flex; align-items: center; gap: 0.3rem; }
+    .panel-header h4 { font-size: 0.85rem; color: #666; margin-right: auto; }
     .btn-expand {
       background: none; border: 1px solid #ddd; border-radius: 4px;
       padding: 0.08rem 0.3rem; font-size: 0.82rem; color: #999; line-height: 1; cursor: pointer;
     }
     .btn-expand:hover { background: #f0f0f0; color: #555; }
     .panel-textarea {
-      width: 100%; height: 56px; font-family: monospace; font-size: 0.73rem;
+      width: 100%; height: 52px; font-family: monospace; font-size: 0.73rem;
       border: 1.5px solid #ddd; border-radius: 7px;
       padding: 0.38rem 0.5rem; resize: none;
       background: #fafaf8; color: #333; transition: border-color 0.15s;
@@ -260,56 +263,86 @@
     .btn-copy-sm {
       background: #4a7bbd; color: white;
       padding: 0.18rem 0.55rem; font-size: 0.72rem; border-radius: 5px;
+      border: none; cursor: pointer; transition: background 0.15s;
     }
     .btn-copy-sm:hover { background: #3869aa; }
     .btn-copy-sm.copied { background: #2a8a5a; }
-    #btn-copy-config:hover, #btn-copy-config-simp:hover { background: #4d7040 !important; }
-    #btn-copy-config.copied, #btn-copy-config-simp.copied { background: #2a8a5a !important; }
+    .btn-copy-sm.green { background: #6a8f5a; }
+    .btn-copy-sm.green:hover { background: #4d7040; }
+    /* mode badge in panel header */
+    .mode-badge {
+      font-size: 0.68rem; padding: 0.1rem 0.4rem;
+      border: 1.5px solid #aaa; border-radius: 4px;
+      background: white; color: #555; cursor: pointer;
+      transition: all 0.12s; white-space: nowrap;
+    }
+    .mode-badge:hover { border-color: #4a7bbd; color: #4a7bbd; }
   </style>
 </head>
 <body>
 
 <div id="diagram-area">
+  <!-- Topbar -->
   <div class="diagram-topbar">
     <div class="n-selector-wrap">
       N:
       <select id="n-selector" onchange="handleNChange(this.value)">
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4" selected>4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
+        <option value="2">2</option><option value="3">3</option>
+        <option value="4" selected>4</option><option value="5">5</option>
+        <option value="6">6</option><option value="7">7</option>
+        <option value="8">8</option><option value="9">9</option>
       </select>
     </div>
-    <div id="target-area"></div>
     <h2 id="diagram-title"></h2>
-    <span id="hint-bar">Click a letter inside any box to begin</span>
+    <div id="right-bar"></div>
   </div>
 
-  <div id="simplified-bar">
-    <label>
-      <input type="checkbox" id="chk-simplified" onchange="handleSimplifiedToggle()">
-      Show Simplified
-    </label>
+  <!-- Target edit bar (paste / manual entry controls) -->
+  <div id="target-edit-bar">
+    <input id="target-paste-input" type="text"
+           placeholder="Paste config code (N|std|rep|cores|k|…) or Choice LaTeX (p(a,\,ab)+…±k)"
+           oninput="handleTargetPaste(this.value)">
+    <span id="target-paste-status"></span>
+    <button class="btn-primary" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="finishTargetSetup()">Done</button>
+    <button class="btn-ghost"   style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>
+  </div>
+
+  <!-- Display mode bar -->
+  <div id="disp-mode-bar">
+    <span>Display:</span>
+    <button class="disp-btn" id="dbtn-0" onclick="setDispMode(0)">As Is</button>
+    <button class="disp-btn active" id="dbtn-1" onclick="setDispMode(1)">All positive p</button>
+    <button class="disp-btn" id="dbtn-2" onclick="setDispMode(2)">Simplified p</button>
   </div>
 
   <div id="hasse"></div>
-
   <div id="congrats">Congratulations! All values matched!</div>
 
-  <div id="bm-expanded" style="display:none">
-    <div id="bm-expanded-header">
+  <!-- Expanded Choice panel -->
+  <div id="choice-expanded" class="expanded-panel" style="display:none">
+    <div class="expanded-panel-header">
+      <strong>Choice — expanded</strong>
+      <div class="mode-options">
+        <label><input type="radio" name="exp-disp" value="0" onchange="setDispMode(0)"> As Is</label>
+        <label><input type="radio" name="exp-disp" value="1" checked onchange="setDispMode(1)"> All positive p</label>
+        <label><input type="radio" name="exp-disp" value="2" onchange="setDispMode(2)"> Simplified p</label>
+      </div>
+      <button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-left:auto;" onclick="toggleExpandChoice()">✕ Close</button>
+    </div>
+    <textarea id="choice-code-expanded" class="expanded-textarea" readonly></textarea>
+  </div>
+
+  <!-- Expanded BM panel -->
+  <div id="bm-expanded" class="expanded-panel" style="display:none">
+    <div class="expanded-panel-header">
       <strong>BM — expanded</strong>
-      <div class="sort-options">
+      <div class="mode-options">
         <label><input type="radio" name="bm-sort" value="alpha" checked onchange="renderBMLatex()"> Alphabetical</label>
         <label><input type="radio" name="bm-sort" value="coeff" onchange="renderBMLatex()"> Coefficient first (↓)</label>
       </div>
       <button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-left:auto;" onclick="toggleExpandBM()">✕ Close</button>
     </div>
-    <textarea id="latex-code-expanded" readonly></textarea>
+    <textarea id="latex-code-expanded" class="expanded-textarea" readonly></textarea>
   </div>
 </div>
 
@@ -320,25 +353,29 @@
     <div id="actions-list"><p class="no-actions-msg">No actions yet.</p></div>
   </div>
 
+  <!-- Choice panel -->
   <div class="sidebar-panel" id="choice-panel">
     <div class="panel-header">
       <h4>Choice</h4>
+      <button class="mode-badge" id="choice-mode-badge" onclick="cycleDispMode()" title="Click to cycle display mode"></button>
       <button class="btn-copy-sm" id="btn-copy-choice" onclick="copyPanel('choice-code','btn-copy-choice','Copy','✓')">Copy</button>
-      <button class="btn-copy-sm" id="btn-copy-config" style="background:#6a8f5a;" onclick="copyConfigCode()">Config As Is</button>
-      <button class="btn-copy-sm" id="btn-copy-config-simp" style="background:#6a8f5a;" onclick="copyConfigSimpCode()">Config Simp</button>
+      <button class="btn-copy-sm green" id="btn-copy-config" onclick="copyChoiceConfig()">Config</button>
+      <button class="btn-expand" id="btn-expand-choice" onclick="toggleExpandChoice()">⤢</button>
     </div>
     <textarea id="choice-code" class="panel-textarea" readonly></textarea>
   </div>
 
+  <!-- BM panel -->
   <div class="sidebar-panel" id="latex-panel">
     <div class="panel-header">
       <h4>BM</h4>
       <button class="btn-copy-sm" id="btn-copy-latex" onclick="copyPanel('latex-code','btn-copy-latex','Copy','✓')">Copy</button>
-      <button class="btn-expand" id="btn-expand-bm" onclick="toggleExpandBM()" title="Expand below diagram">⤢</button>
+      <button class="btn-expand" id="btn-expand-bm" onclick="toggleExpandBM()">⤢</button>
     </div>
     <textarea id="latex-code" class="panel-textarea" readonly></textarea>
   </div>
 
+  <!-- Save Code -->
   <div class="sidebar-panel" id="code-panel">
     <div class="panel-header">
       <h4>Save Code</h4>
@@ -351,216 +388,342 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════
-//  STATE
+//  GAME STATE
 // ═══════════════════════════════════════════════════════════
-let N = 0, alts = [], coeffs = {}, touched = {}, actions = [];
-let selLetter = null, selSource = null;
-let _updatingCode = false, _bmExpanded = false;
+let N=0, alts=[], coeffs={}, touched={}, actions=[];
+let selLetter=null, selSource=null;
+let _updatingCode=false, _bmExpanded=false, _choiceExpanded=false;
+
+// dispMode: 0=As Is, 1=All positive p, 2=Simplified p
+let dispMode = 1;
 
 // Target state
-let targetCoeffs = {}, targetActive = false, targetEditMode = false;
-let showSimplified = false;
+let targetCoeffs={}, targetK=0, targetActive=false, targetEditMode=false;
 
 // ═══════════════════════════════════════════════════════════
-//  HELPERS
+//  CORE HELPERS
 // ═══════════════════════════════════════════════════════════
-function popcount(n) { let c=0; while(n){c+=n&1;n>>>=1;} return c; }
-function maskLetterIndices(mask) {
-  const out=[]; for(let i=0;i<N;i++) if(mask&(1<<i)) out.push(i); return out;
+function popcount(n){let c=0;while(n){c+=n&1;n>>>=1;}return c;}
+function maskLetterIndices(mask){
+  const out=[];for(let i=0;i<N;i++)if(mask&(1<<i))out.push(i);return out;
 }
-function maskToStr(mask) { return maskLetterIndices(mask).map(i=>alts[i]).join(''); }
-function layeredMasks() {
+function maskToStr(mask){return maskLetterIndices(mask).map(i=>alts[i]).join('');}
+function layeredMasks(){
   const layers=[];
   for(let size=N;size>=1;size--){
     const row=[];
-    for(let m=1;m<(1<<N);m++) if(popcount(m)===size) row.push(m);
+    for(let m=1;m<(1<<N);m++)if(popcount(m)===size)row.push(m);
     row.sort((a,b)=>{
       const ia=maskLetterIndices(a),ib=maskLetterIndices(b);
-      for(let i=0;i<ia.length;i++) if(ia[i]!==ib[i]) return ia[i]-ib[i];
+      for(let i=0;i<ia.length;i++)if(ia[i]!==ib[i])return ia[i]-ib[i];
       return 0;
     });
     layers.push(row);
   }
   return layers;
 }
-function getCoeff(mask,li) { return (coeffs[mask]&&coeffs[mask][li]!==undefined)?coeffs[mask][li]:0; }
-function isTouched(mask,li) { return !!(touched[mask]&&touched[mask].has(li)); }
-function isValidTarget(mask) {
-  if(selLetter===null||selSource===null) return false;
-  return (mask&selSource)===selSource;
+function getCoeff(mask,li){return(coeffs[mask]&&coeffs[mask][li]!==undefined)?coeffs[mask][li]:0;}
+function isTouched(mask,li){return!!(touched[mask]&&touched[mask].has(li));}
+function isValidTarget(mask){
+  if(selLetter===null||selSource===null)return false;
+  return(mask&selSource)===selSource;
 }
 
 // ═══════════════════════════════════════════════════════════
 //  TARGET HELPERS
 // ═══════════════════════════════════════════════════════════
-function getTargetCoeff(mask,li) {
-  return (targetCoeffs[mask]&&targetCoeffs[mask][li]!==undefined)?targetCoeffs[mask][li]:0;
+function getTargetCoeff(mask,li){
+  return(targetCoeffs[mask]&&targetCoeffs[mask][li]!==undefined)?targetCoeffs[mask][li]:0;
 }
-function setTargetCoeff(mask,li,val) {
-  if(!targetCoeffs[mask]) targetCoeffs[mask]={};
+function setTargetCoeff(mask,li,val){
+  if(!targetCoeffs[mask])targetCoeffs[mask]={};
   targetCoeffs[mask][li]=val;
 }
 
-// minimum coefficient in a set (for simplified display)
-function setMin(mask, src) {
+// factorForSet: how much to subtract from each letter in set for the given mode
+function factorForSet(mask,src,mode){
   const letters=maskLetterIndices(mask);
-  if(!letters.length) return 0;
-  return Math.min(...letters.map(li=> src==='target'?getTargetCoeff(mask,li):getCoeff(mask,li)));
+  if(!letters.length)return 0;
+  const get=li=>src==='target'?getTargetCoeff(mask,li):getCoeff(mask,li);
+  const vals=letters.map(get);
+  const mn=Math.min(...vals),mx=Math.max(...vals);
+  if(mode===0)return 0;                // As Is: no factoring
+  if(mode===1)return mn;               // All positive p: subtract min (makes all ≥ 0)
+  // mode 2 Simplified p: only factor if all same sign
+  if(mn>0)return mn;                   // all positive: subtract min → min becomes 0
+  if(mx<0)return mx;                   // all negative: subtract max → max becomes 0
+  return 0;                            // mixed signs: no factoring
 }
 
-function getDisplayCoeff(mask,li) {
-  return showSimplified ? getCoeff(mask,li)-setMin(mask,'current') : getCoeff(mask,li);
+function dispCoeff(mask,li){return getCoeff(mask,li)-factorForSet(mask,'current',dispMode);}
+function dispTargetCoeff(mask,li){return getTargetCoeff(mask,li)-factorForSet(mask,'target',dispMode);}
+
+function currentConstant(){
+  let t=0;for(let m=1;m<(1<<N);m++)t+=factorForSet(m,'current',dispMode);return t;
 }
-function getDisplayTargetCoeff(mask,li) {
-  return showSimplified ? getTargetCoeff(mask,li)-setMin(mask,'target') : getTargetCoeff(mask,li);
-}
-function computeCurrentConstant() {
-  let t=0; for(let m=1;m<(1<<N);m++) t+=setMin(m,'current'); return t;
-}
-function computeTargetConstant() {
-  let t=0; for(let m=1;m<(1<<N);m++) t+=setMin(m,'target'); return t;
+function targetConstant(){
+  let t=0;for(let m=1;m<(1<<N);m++)t+=factorForSet(m,'target',dispMode);return t+targetK;
 }
 
-function isMatched(mask,li) {
-  if(!targetActive) return false;
-  return getCoeff(mask,li)===getTargetCoeff(mask,li);
+function isMatched(mask,li){
+  return targetActive&&dispCoeff(mask,li)===dispTargetCoeff(mask,li);
 }
-function checkAllMatched() {
-  if(!targetActive) return false;
-  for(let mask=1;mask<(1<<N);mask++)
-    for(const li of maskLetterIndices(mask))
-      if(getCoeff(mask,li)!==getTargetCoeff(mask,li)) return false;
-  return true;
+function checkAllMatched(){
+  if(!targetActive)return false;
+  for(let m=1;m<(1<<N);m++)
+    for(const li of maskLetterIndices(m))
+      if(dispCoeff(m,li)!==dispTargetCoeff(m,li))return false;
+  return currentConstant()===targetConstant();
 }
-function updateCongrats() {
-  const el=document.getElementById('congrats');
-  if(el) el.style.display=checkAllMatched()?'':'none';
+function updateCongrats(){
+  document.getElementById('congrats').style.display=checkAllMatched()?'':'none';
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PARSE CONFIG CODE → TARGET
+//  PARSE INPUT → TARGET
+//  Accepts: matlabsolver config code  OR  Choice LaTeX formula
 // ═══════════════════════════════════════════════════════════
-function parseConfigAsTarget(raw) {
+function parseInputAsTarget(raw){
   raw=raw.trim();
+  if(!raw)return null;
+  // Config code: starts with digit(s) then |
+  if(/^\d+\|/.test(raw))return parseConfigCode(raw);
+  // Choice LaTeX: contains p(
+  if(/p\s*\(/.test(raw))return parseChoiceLatex(raw);
+  return null;
+}
+
+function parseConfigCode(raw){
   const parts=raw.split('|');
-  if(parts.length<5) return false;
+  if(parts.length<5)return null;
   const n=parseInt(parts[0]);
-  if(isNaN(n)||n!==N) return false;
+  if(isNaN(n)||n<2||n>9)return null;
   const k=parseInt(parts[4]);
-  if(isNaN(k)) return false;
+  if(isNaN(k))return null;
   const newTarget={};
   for(let i=5;i<parts.length;i++){
-    const p=parts[i].trim(); if(!p) continue;
+    const p=parts[i].trim();if(!p)continue;
     const m=p.match(/^(\d+):(\d+):(-?\d+)$/);
-    if(!m) return false;
+    if(!m)return null;
     const mask=+m[1],li=+m[2],val=+m[3];
-    if(mask<1||mask>=(1<<n)||li<0||li>=n) return false;
-    if(!(mask&(1<<li))) return false;
-    if(!newTarget[mask]) newTarget[mask]={};
+    if(mask<1||mask>=(1<<n)||li<0||li>=n)return null;
+    if(!(mask&(1<<li)))return null;
+    if(!newTarget[mask])newTarget[mask]={};
     newTarget[mask][li]=val;
   }
+  // Apply k to full set (matlabsolver convention)
   if(k!==0){
-    const X=(1<<N)-1;
-    if(!newTarget[X]) newTarget[X]={};
-    for(let x=0;x<N;x++) newTarget[X][x]=(newTarget[X][x]||0)+k;
+    const X=(1<<n)-1;
+    if(!newTarget[X])newTarget[X]={};
+    for(let x=0;x<n;x++)newTarget[X][x]=(newTarget[X][x]||0)+k;
   }
-  targetCoeffs=newTarget;
-  targetActive=true;
-  targetEditMode=false;
+  return{n,targetCoeffs:newTarget,targetK:0};
+}
+
+function parseChoiceLatex(text){
+  // Normalize: remove \, and extra whitespace
+  let s=text.replace(/\\,/g,',').replace(/\\/g,'').replace(/\s+/g,' ').trim();
+  const newTarget={};
+  let constant=0;
+  const consumed=[];
+
+  // Match: [optional sign+coeff] p(letter, letters)
+  const re=/([+\-]?\s*\d*)\s*p\s*\(\s*([a-z])\s*,\s*([a-zA-Z]+)\s*\)/gi;
+  let m;
+  while((m=re.exec(s))!==null){
+    let cs=m[1].replace(/\s/g,'');
+    const xChar=m[2].toLowerCase();
+    const sStr=m[3].toLowerCase();
+    let coeff=cs===''||cs==='+'?1:cs==='-'?-1:parseInt(cs);
+    if(isNaN(coeff))return null;
+    const x=alts.indexOf(xChar);
+    if(x<0)return null;
+    let mask=0;
+    for(const ch of sStr){
+      const idx=alts.indexOf(ch);
+      if(idx<0)return null;
+      mask|=(1<<idx);
+    }
+    if(!(mask&(1<<x)))return null;
+    if(!newTarget[mask])newTarget[mask]={};
+    newTarget[mask][x]=(newTarget[mask][x]||0)+coeff;
+    consumed.push([m.index,m.index+m[0].length]);
+  }
+  if(!consumed.length)return null;
+
+  // Extract constant from remainder
+  let rem=s;
+  [...consumed].reverse().forEach(([a,b])=>{
+    rem=rem.slice(0,a)+' '.repeat(b-a)+rem.slice(b);
+  });
+  rem=rem.replace(/\s+/g,'');
+  if(rem){
+    const tokens=rem.match(/[+\-]?\d+/g);
+    if(tokens)constant=tokens.reduce((s,t)=>s+parseInt(t),0);
+  }
+  return{n:N,targetCoeffs:newTarget,targetK:constant};
+}
+
+function applyParsedTarget(result){
+  if(!result)return false;
+  if(result.n!==N){
+    const hasActions=actions.some(a=>a.parsed);
+    if(hasActions&&!confirm(`Target has N=${result.n} but current is N=${N}. Changing N will clear all actions. Continue?`))
+      return false;
+    initGame(result.n,null);updateTitle();
+  }
+  targetCoeffs=result.targetCoeffs;
+  targetK=result.targetK;
+  targetActive=true;targetEditMode=false;
   return true;
 }
 
 // ═══════════════════════════════════════════════════════════
 //  TARGET UI
 // ═══════════════════════════════════════════════════════════
-function renderTargetArea() {
-  const area=document.getElementById('target-area');
-  if(!targetActive&&!targetEditMode) {
-    area.innerHTML=`<button class="btn-ghost" style="font-size:0.82rem;padding:0.28rem 0.75rem;" onclick="enterTargetMode()">Set Target</button>`;
-  } else if(targetEditMode) {
-    area.innerHTML=
-      `<input id="target-input" type="text" placeholder="Paste Config As Is code… or enter targets manually below"
-              oninput="handleTargetCodePaste(this.value)">` +
-      `<button class="btn-primary" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="finishTargetSetup()">Done</button>` +
-      `<button class="btn-ghost"   style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>`;
+function renderRightBar(){
+  const rb=document.getElementById('right-bar');
+  if(selLetter!==null){
+    // Selection mode: show hint + cancel
+    rb.innerHTML=
+      `<span class="hint-selecting">`+
+      `<strong>${alts[selLetter]}</strong> in {${maskToStr(selSource)}} — click a highlighted box</span>`+
+      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.25rem 0.65rem;" onclick="cancelSelection()">Cancel</button>`;
+  } else if(!targetActive&&!targetEditMode){
+    rb.innerHTML=`<button class="btn-set-target" onclick="enterTargetMode()">Set Target</button>`;
+  } else if(targetEditMode){
+    rb.innerHTML=`<span style="font-size:0.79rem;color:#9a6800;">Setting target…</span>`;
   } else {
-    area.innerHTML=
-      `<span style="font-size:0.79rem;color:#2a7a3a;font-weight:bold;">▶ Target set</span>` +
-      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="enterTargetMode()">Edit</button>` +
-      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>`;
+    rb.innerHTML=
+      `<span class="target-set-badge">▶ Target set</span>`+
+      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.24rem 0.6rem;" onclick="enterTargetMode()">Edit</button>`+
+      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.24rem 0.6rem;" onclick="clearTarget()">Clear</button>`;
   }
 }
 
-function enterTargetMode() {
-  targetActive=true; targetEditMode=true;
-  renderTargetArea(); renderHasse(); updateCongrats();
+function renderTargetEditBar(){
+  const bar=document.getElementById('target-edit-bar');
+  if(targetEditMode){
+    bar.classList.add('visible');
+    // keep existing input value
+  } else {
+    bar.classList.remove('visible');
+  }
 }
-function finishTargetSetup() {
+
+function enterTargetMode(){
+  targetActive=true;targetEditMode=true;
+  const inp=document.getElementById('target-paste-input');
+  if(inp){inp.value='';inp.classList.remove('parse-ok','parse-err');}
+  document.getElementById('target-paste-status').textContent='';
+  renderRightBar();renderTargetEditBar();
+  renderHasse();updateCongrats();
+}
+function finishTargetSetup(){
   targetEditMode=false;
-  renderTargetArea(); renderHasse(); updateCongrats();
+  renderRightBar();renderTargetEditBar();
+  renderHasse();updateCongrats();
 }
-function clearTarget() {
-  targetCoeffs={}; targetActive=false; targetEditMode=false;
-  renderTargetArea(); renderAll();
+function clearTarget(){
+  targetCoeffs={};targetK=0;targetActive=false;targetEditMode=false;
+  const inp=document.getElementById('target-paste-input');
+  if(inp){inp.value='';inp.classList.remove('parse-ok','parse-err');}
+  document.getElementById('target-paste-status').textContent='';
+  renderRightBar();renderTargetEditBar();renderAll();
 }
-function handleTargetCodePaste(raw) {
-  const inp=document.getElementById('target-input');
-  if(!inp) return;
-  if(!raw.trim()){ inp.classList.remove('parse-ok','parse-err'); return; }
-  const ok=parseConfigAsTarget(raw);
-  inp.classList.toggle('parse-ok', ok);
-  inp.classList.toggle('parse-err',!ok);
-  if(ok){ renderTargetArea(); renderHasse(); updateCongrats(); }
-}
-function handleSimplifiedToggle() {
-  showSimplified=document.getElementById('chk-simplified').checked;
-  renderHasse(); renderChoiceLatex(); renderBMLatex();
+
+function handleTargetPaste(raw){
+  const inp=document.getElementById('target-paste-input');
+  const statusEl=document.getElementById('target-paste-status');
+  if(!raw.trim()){
+    inp.classList.remove('parse-ok','parse-err');
+    statusEl.textContent='';
+    return;
+  }
+  const result=parseInputAsTarget(raw);
+  if(!result){
+    inp.classList.remove('parse-ok');inp.classList.add('parse-err');
+    statusEl.textContent='⚠ Unrecognised format';
+    statusEl.style.color='#c0392b';
+  } else {
+    inp.classList.remove('parse-err');inp.classList.add('parse-ok');
+    const ok=applyParsedTarget(result);
+    if(ok){
+      statusEl.textContent=`✓ Loaded (N=${result.n})`;
+      statusEl.style.color='#2a8a5a';
+      renderRightBar();renderTargetEditBar();renderHasse();updateCongrats();
+      renderChoiceLatex();
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  CORE BM LOGIC
+//  DISPLAY MODE
 // ═══════════════════════════════════════════════════════════
-function recomputeAll() {
-  coeffs={}; touched={};
+const MODE_LABELS=['As Is','All+p','Simp p'];
+
+function setDispMode(m){
+  dispMode=+m;
+  // Sync disp-mode-bar buttons
+  [0,1,2].forEach(i=>{
+    const b=document.getElementById(`dbtn-${i}`);
+    if(b)b.classList.toggle('active',i===dispMode);
+  });
+  // Sync expanded choice radio
+  const r=document.querySelector(`input[name="exp-disp"][value="${m}"]`);
+  if(r)r.checked=true;
+  // Update badge
+  const badge=document.getElementById('choice-mode-badge');
+  if(badge)badge.textContent=MODE_LABELS[dispMode]+' ▸';
+  renderHasse();renderChoiceLatex();
+}
+
+function cycleDispMode(){setDispMode((dispMode+1)%3);}
+
+// ═══════════════════════════════════════════════════════════
+//  BM CORE
+// ═══════════════════════════════════════════════════════════
+function recomputeAll(){
+  coeffs={};touched={};
   for(const action of actions){
-    if(!action.parsed) continue;
-    const {x,S,T}=action.parsed;
+    if(!action.parsed)continue;
+    const{x,S,T}=action.parsed;
     for(let mask=1;mask<(1<<N);mask++){
-      if(!(mask&(1<<x))) continue;
-      if((mask&S)!==S)   continue;
-      if((mask&T)!==mask) continue;
+      if(!(mask&(1<<x)))continue;
+      if((mask&S)!==S)continue;
+      if((mask&T)!==mask)continue;
       const diff=mask&~S;
       const delta=popcount(diff)%2===0?1:-1;
-      if(!coeffs[mask]) coeffs[mask]={};
+      if(!coeffs[mask])coeffs[mask]={};
       coeffs[mask][x]=(coeffs[mask][x]||0)+delta;
-      if(!touched[mask]) touched[mask]=new Set();
+      if(!touched[mask])touched[mask]=new Set();
       touched[mask].add(x);
     }
   }
 }
-function doUndoAction(idx){ actions.splice(idx,1); recomputeAll(); renderAll(); }
+function doUndoAction(idx){actions.splice(idx,1);recomputeAll();renderAll();}
 
 // ═══════════════════════════════════════════════════════════
 //  PARSE ACTION TEXT
 // ═══════════════════════════════════════════════════════════
 function lettersToMask(str){
   let mask=0;
-  for(const ch of (str||'').toLowerCase()){
-    const idx=alts.indexOf(ch); if(idx<0) return -1; mask|=(1<<idx);
+  for(const ch of(str||'').toLowerCase()){
+    const idx=alts.indexOf(ch);if(idx<0)return -1;mask|=(1<<idx);
   }
   return mask;
 }
 function parseActionText(text){
   text=text.trim().replace(/→/g,'->').replace(/\s+/g,' ');
   const m=text.match(/^([a-zA-Z])\s*:\s*\{?([a-zA-Z]*)\}?\s*->\s*\{?([a-zA-Z]*)\}?\s*$/);
-  if(!m) return null;
-  const x=alts.indexOf(m[1].toLowerCase()); if(x<0) return null;
-  const S=lettersToMask(m[2]), T=lettersToMask(m[3]);
-  if(S<0||T<0||S<1||S>=(1<<N)||T<1||T>=(1<<N)) return null;
-  if(!(S&(1<<x))||(T&S)!==S) return null;
-  return {x,S,T};
+  if(!m)return null;
+  const x=alts.indexOf(m[1].toLowerCase());if(x<0)return null;
+  const S=lettersToMask(m[2]),T=lettersToMask(m[3]);
+  if(S<0||T<0||S<1||S>=(1<<N)||T<1||T>=(1<<N))return null;
+  if(!(S&(1<<x))||(T&S)!==S)return null;
+  return{x,S,T};
 }
-function actionToText(x,S,T){ return `${alts[x]}: {${maskToStr(S)}} → {${maskToStr(T)}}`; }
+function actionToText(x,S,T){return`${alts[x]}: {${maskToStr(S)}} → {${maskToStr(T)}}`;}
 
 // ═══════════════════════════════════════════════════════════
 //  SAVE / LOAD CODE
@@ -568,38 +731,38 @@ function actionToText(x,S,T){ return `${alts[x]}: {${maskToStr(S)}} → {${maskT
 function generateCode(){
   const parts=[`${N}`];
   for(const action of actions){
-    if(!action.parsed) continue;
-    const {x,S,T}=action.parsed;
+    if(!action.parsed)continue;
+    const{x,S,T}=action.parsed;
     parts.push(`${alts[x]}:${S.toString(16)}-${T.toString(16)}`);
   }
   return parts.join('|');
 }
-function parseCode(raw){
+function parseSaveCode(raw){
   raw=raw.trim();
   const parts=raw.split('|');
   const n=parseInt(parts[0],10);
-  if(isNaN(n)||n<2||n>9) return null;
+  if(isNaN(n)||n<2||n>9)return null;
   const parsed=[];
   for(let i=1;i<parts.length;i++){
-    const p=parts[i].trim(); if(!p) continue;
+    const p=parts[i].trim();if(!p)continue;
     const m=p.match(/^([a-zA-Z]):([0-9a-fA-F]+)-([0-9a-fA-F]+)$/);
-    if(!m) return null;
+    if(!m)return null;
     const x='abcdefghi'.indexOf(m[1].toLowerCase());
-    const S=parseInt(m[2],16), T=parseInt(m[3],16);
-    if(x<0||x>=n||S<1||S>=(1<<n)||T<1||T>=(1<<n)) return null;
-    if(!(S&(1<<x))||(T&S)!==S) return null;
+    const S=parseInt(m[2],16),T=parseInt(m[3],16);
+    if(x<0||x>=n||S<1||S>=(1<<n)||T<1||T>=(1<<n))return null;
+    if(!(S&(1<<x))||(T&S)!==S)return null;
     parsed.push({x,S,T});
   }
-  return {n,actions:parsed};
+  return{n,actions:parsed};
 }
 
 // ═══════════════════════════════════════════════════════════
 //  INIT / N CHANGE
 // ═══════════════════════════════════════════════════════════
 function initGame(n,loadedActions){
-  N=n; alts='abcdefghi'.slice(0,N).split('');
-  coeffs={}; touched={}; actions=[];
-  selLetter=null; selSource=null;
+  N=n;alts='abcdefghi'.slice(0,N).split('');
+  coeffs={};touched={};actions=[];
+  selLetter=null;selSource=null;
   if(loadedActions){
     for(const a of loadedActions)
       actions.push({raw:actionToText(a.x,a.S,a.T),parsed:a});
@@ -611,14 +774,14 @@ function updateTitle(){
   document.getElementById('n-selector').value=String(N);
 }
 function handleNChange(val){
-  const n=parseInt(val); if(n===N) return;
+  const n=parseInt(val);if(n===N)return;
   if(actions.some(a=>a.parsed))
     if(!confirm(`Changing N to ${n} will clear all current actions. Continue?`)){
-      document.getElementById('n-selector').value=String(N); return;
+      document.getElementById('n-selector').value=String(N);return;
     }
-  targetCoeffs={}; targetActive=false; targetEditMode=false;
-  initGame(n,null); updateTitle();
-  renderTargetArea(); renderAll();
+  targetCoeffs={};targetK=0;targetActive=false;targetEditMode=false;
+  initGame(n,null);updateTitle();
+  renderRightBar();renderTargetEditBar();renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -626,55 +789,55 @@ function handleNChange(val){
 // ═══════════════════════════════════════════════════════════
 function handleLetterClick(mask,li,ctrlHeld){
   if(ctrlHeld){
-    const T=(1<<N)-1; selLetter=null; selSource=null;
+    const T=(1<<N)-1;selLetter=null;selSource=null;
     actions.push({raw:actionToText(li,mask,T),parsed:{x:li,S:mask,T}});
-    recomputeAll(); renderAll(); return;
+    recomputeAll();renderAll();return;
   }
   if(selLetter!==null&&selSource!==null){
-    if(isValidTarget(mask)){ finishSelection(mask); return; }
-    if(selLetter===li&&selSource===mask){ cancelSelection(); return; }
+    if(isValidTarget(mask)){finishSelection(mask);return;}
+    if(selLetter===li&&selSource===mask){cancelSelection();return;}
   }
-  selLetter=li; selSource=mask; renderAll();
+  selLetter=li;selSource=mask;renderAll();
 }
-function handleTargetBoxClick(mask){ if(!isValidTarget(mask)) return; finishSelection(mask); }
+function handleTargetBoxClick(mask){if(!isValidTarget(mask))return;finishSelection(mask);}
 function finishSelection(targetMask){
   const x=selLetter,S=selSource,T=targetMask;
-  selLetter=null; selSource=null;
+  selLetter=null;selSource=null;
   actions.push({raw:actionToText(x,S,T),parsed:{x,S,T}});
-  recomputeAll(); renderAll();
+  recomputeAll();renderAll();
 }
-function cancelSelection(){ selLetter=null; selSource=null; renderAll(); }
+function cancelSelection(){selLetter=null;selSource=null;renderAll();}
 
 function applyHoverPreview(T){
-  if(selLetter===null||selSource===null) return;
+  if(selLetter===null||selSource===null)return;
   const x=selLetter,S=selSource;
   for(let mask=1;mask<(1<<N);mask++){
-    if(!(mask&(1<<x))) continue;
-    if((mask&S)!==S) continue;
-    if((mask&T)!==mask) continue;
-    const diff=popcount(mask&~S), delta=diff%2===0?1:-1;
-    const el=document.getElementById(`cc-${mask}-${x}`); if(!el) continue;
+    if(!(mask&(1<<x)))continue;
+    if((mask&S)!==S)continue;
+    if((mask&T)!==mask)continue;
+    const diff=popcount(mask&~S),delta=diff%2===0?1:-1;
+    const el=document.getElementById(`cc-${mask}-${x}`);if(!el)continue;
     const rawNew=getCoeff(mask,x)+delta;
-    const newVal=showSimplified?rawNew-setMin(mask,'current'):rawNew;
+    const factor=factorForSet(mask,'current',dispMode);
+    const newVal=rawNew-factor;
     el.textContent=String(newVal);
     el.className='coeff-cell coeff-preview';
-    if(newVal>0) el.classList.add('coeff-pos');
-    else if(newVal<0) el.classList.add('coeff-neg');
+    if(newVal>0)el.classList.add('coeff-pos');
+    else if(newVal<0)el.classList.add('coeff-neg');
     else el.classList.add('coeff-zero');
   }
 }
 function clearHoverPreview(){
   document.querySelectorAll('.coeff-cell.coeff-preview').forEach(el=>{
-    const parts=el.id.split('-');
-    const mask=+parts[1],li=+parts[2];
-    const val=getDisplayCoeff(mask,li);
+    const parts=el.id.split('-');const mask=+parts[1],li=+parts[2];
+    const val=dispCoeff(mask,li);
     el.className='coeff-cell';
     if(isTouched(mask,li)){
       el.textContent=String(val);
-      if(val>0) el.classList.add('coeff-pos');
-      else if(val<0) el.classList.add('coeff-neg');
+      if(val>0)el.classList.add('coeff-pos');
+      else if(val<0)el.classList.add('coeff-neg');
       else el.classList.add('coeff-zero');
-    } else { el.textContent=''; }
+    }else{el.textContent='';}
   });
 }
 
@@ -685,27 +848,27 @@ function generateLatex(sortMode){
   sortMode=sortMode||'alpha';
   const counts=new Map();
   for(const action of actions){
-    if(!action.parsed) continue;
-    const {x,S,T}=action.parsed;
+    if(!action.parsed)continue;
+    const{x,S,T}=action.parsed;
     const key=`${x}|${S}|${T}`;
     counts.set(key,(counts.get(key)||0)+1);
   }
-  if(counts.size===0) return '';
+  if(counts.size===0)return'';
   const entries=[...counts.entries()].map(([key,count])=>{
-    const [x,S,T]=key.split('|').map(Number); return {x,S,T,count};
+    const[x,S,T]=key.split('|').map(Number);return{x,S,T,count};
   });
   if(sortMode==='coeff'){
     entries.sort((a,b)=>{
-      if(b.count!==a.count) return b.count-a.count;
-      if(a.x!==b.x) return a.x-b.x;
-      const sa=maskToStr(a.S),sb=maskToStr(b.S); if(sa!==sb) return sa<sb?-1:1;
-      const ta=maskToStr(a.T),tb=maskToStr(b.T); return ta<tb?-1:ta>tb?1:0;
+      if(b.count!==a.count)return b.count-a.count;
+      if(a.x!==b.x)return a.x-b.x;
+      const sa=maskToStr(a.S),sb=maskToStr(b.S);if(sa!==sb)return sa<sb?-1:1;
+      const ta=maskToStr(a.T),tb=maskToStr(b.T);return ta<tb?-1:ta>tb?1:0;
     });
-  } else {
+  }else{
     entries.sort((a,b)=>{
-      if(a.x!==b.x) return a.x-b.x;
-      const sa=maskToStr(a.S),sb=maskToStr(b.S); if(sa!==sb) return sa<sb?-1:1;
-      const ta=maskToStr(a.T),tb=maskToStr(b.T); return ta<tb?-1:ta>tb?1:0;
+      if(a.x!==b.x)return a.x-b.x;
+      const sa=maskToStr(a.S),sb=maskToStr(b.S);if(sa!==sb)return sa<sb?-1:1;
+      const ta=maskToStr(a.T),tb=maskToStr(b.T);return ta<tb?-1:ta>tb?1:0;
     });
   }
   return entries.map(({x,S,T,count})=>
@@ -713,103 +876,94 @@ function generateLatex(sortMode){
   ).join(' + ');
 }
 
+// generateChoiceLatex: uses dispMode for factoring
 function generateChoiceLatex(){
-  if(!actions.some(a=>a.parsed)) return '';
-  let constant=0; const pTerms=[];
+  if(!actions.some(a=>a.parsed))return'';
+  let constant=0;const pTerms=[];
   for(let mask=1;mask<(1<<N);mask++){
-    const letters=maskLetterIndices(mask); if(!letters.length) continue;
-    const c={};
-    for(const li of letters) c[li]=getCoeff(mask,li);
-    const minC=Math.min(...letters.map(li=>c[li]));
-    if(minC!==0){ constant+=minC; for(const li of letters) c[li]-=minC; }
-    for(const li of letters) if(c[li]!==0) pTerms.push({x:li,mask,coeff:c[li]});
+    const letters=maskLetterIndices(mask);if(!letters.length)continue;
+    const factor=factorForSet(mask,'current',dispMode);
+    constant+=factor;
+    for(const li of letters){
+      const residual=getCoeff(mask,li)-factor;
+      if(residual!==0)pTerms.push({x:li,mask,coeff:residual});
+    }
   }
   pTerms.sort((a,b)=>{
-    if(a.x!==b.x) return a.x-b.x;
-    const sa=maskToStr(a.mask),sb=maskToStr(b.mask); return sa<sb?-1:sa>sb?1:0;
+    if(a.x!==b.x)return a.x-b.x;
+    const sa=maskToStr(a.mask),sb=maskToStr(b.mask);return sa<sb?-1:sa>sb?1:0;
   });
-  if(!pTerms.length&&constant===0) return '0';
+  if(!pTerms.length&&constant===0)return'0';
   const allParts=[
     ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},\\,${maskToStr(mask)})`})),
     ...(constant!==0?[{val:constant,str:''}]:[])
   ];
-  if(!allParts.length) return '0';
+  if(!allParts.length)return'0';
   let result='';
-  for(const {val,str} of allParts){
+  for(const{val,str}of allParts){
     const abs=Math.abs(val),pos=val>0;
     const coeffStr=(abs===1&&str)?'':String(abs);
-    if(result==='') result=(pos?'':'-')+coeffStr+str;
+    if(result==='')result=(pos?'':'-')+coeffStr+str;
     else result+=(pos?' + ':' - ')+coeffStr+str;
   }
   return result;
 }
 
-function generateConfigCode(){
-  const parts=[N,1,1,1,0];
-  for(let mask=1;mask<(1<<N);mask++)
-    for(const li of maskLetterIndices(mask)){
-      const val=getCoeff(mask,li);
-      if(val!==0) parts.push(`${mask}:${li}:${val}`);
-    }
-  return parts.join('|');
-}
-function generateConfigSimpCode(){
-  let constant=0; const residuals=[];
+// generateChoiceConfig: config code matching the current display mode
+function generateChoiceConfig(){
+  let k=0;const parts=[N,1,1,1];  // placeholder for k
+  const entries=[];
   for(let mask=1;mask<(1<<N);mask++){
-    const letters=maskLetterIndices(mask); if(!letters.length) continue;
-    const c={};
-    for(const li of letters) c[li]=getCoeff(mask,li);
-    const minC=Math.min(...letters.map(li=>c[li]));
-    if(minC!==0){ constant+=minC; for(const li of letters) c[li]-=minC; }
-    for(const li of letters) if(c[li]!==0) residuals.push({mask,li,val:c[li]});
+    const letters=maskLetterIndices(mask);if(!letters.length)continue;
+    const factor=factorForSet(mask,'current',dispMode);
+    k+=factor;
+    for(const li of letters){
+      const val=getCoeff(mask,li)-factor;
+      if(val!==0)entries.push(`${mask}:${li}:${val}`);
+    }
   }
-  const parts=[N,1,1,1,constant];
-  for(const {mask,li,val} of residuals) parts.push(`${mask}:${li}:${val}`);
+  parts.push(k,...entries);
   return parts.join('|');
-}
-function copyConfigCode(){
-  const text=generateConfigCode(), btn=document.getElementById('btn-copy-config');
-  navigator.clipboard.writeText(text).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
-    ta.select();document.execCommand('copy');document.body.removeChild(ta);
-  });
-  const orig=btn.textContent; btn.textContent='✓'; btn.classList.add('copied');
-  setTimeout(()=>{btn.textContent=orig;btn.classList.remove('copied');},1800);
-}
-function copyConfigSimpCode(){
-  const text=generateConfigSimpCode(), btn=document.getElementById('btn-copy-config-simp');
-  navigator.clipboard.writeText(text).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
-    ta.select();document.execCommand('copy');document.body.removeChild(ta);
-  });
-  const orig=btn.textContent; btn.textContent='✓'; btn.classList.add('copied');
-  setTimeout(()=>{btn.textContent=orig;btn.classList.remove('copied');},1800);
 }
 
 // ═══════════════════════════════════════════════════════════
 //  RENDERING
 // ═══════════════════════════════════════════════════════════
 function renderAll(){
-  renderHasse(); renderSidebar(); renderChoiceLatex(); renderBMLatex(); updateCongrats();
+  renderHasse();renderSidebar();renderChoiceLatex();renderBMLatex();updateCongrats();
   _updatingCode=true;
   document.getElementById('save-code').value=generateCode();
   _updatingCode=false;
   document.getElementById('save-code').classList.remove('parse-error');
   document.getElementById('save-code-status').textContent='';
 }
-function renderChoiceLatex(){ document.getElementById('choice-code').value=generateChoiceLatex(); }
+
+function renderChoiceLatex(){
+  const text=generateChoiceLatex();
+  document.getElementById('choice-code').value=text;
+  if(_choiceExpanded)document.getElementById('choice-code-expanded').value=text;
+}
+
 function renderBMLatex(){
   const sortMode=document.querySelector('input[name="bm-sort"]:checked')?.value||'alpha';
   const text=generateLatex(sortMode);
   document.getElementById('latex-code').value=text;
-  if(_bmExpanded) document.getElementById('latex-code-expanded').value=text;
+  if(_bmExpanded)document.getElementById('latex-code-expanded').value=text;
 }
+
+function toggleExpandChoice(){
+  _choiceExpanded=!_choiceExpanded;
+  document.getElementById('choice-expanded').style.display=_choiceExpanded?'':'none';
+  const btn=document.getElementById('btn-expand-choice');
+  btn.textContent=_choiceExpanded?'⤡':'⤢';
+  if(_choiceExpanded)document.getElementById('choice-code-expanded').value=generateChoiceLatex();
+}
+
 function toggleExpandBM(){
   _bmExpanded=!_bmExpanded;
-  const panel=document.getElementById('bm-expanded'), btn=document.getElementById('btn-expand-bm');
-  panel.style.display=_bmExpanded?'':'none';
+  document.getElementById('bm-expanded').style.display=_bmExpanded?'':'none';
+  const btn=document.getElementById('btn-expand-bm');
   btn.textContent=_bmExpanded?'⤡':'⤢';
-  btn.title=_bmExpanded?'Collapse':'Expand below diagram';
   if(_bmExpanded){
     const sortMode=document.querySelector('input[name="bm-sort"]:checked')?.value||'alpha';
     document.getElementById('latex-code-expanded').value=generateLatex(sortMode);
@@ -821,41 +975,60 @@ function renderHasse(){
   hasse.classList.toggle('selecting-mode',selLetter!==null);
   hasse.innerHTML='';
 
-  // Constant box: shown when target active or simplified on
-  if(targetActive||showSimplified){
-    const currentConst=computeCurrentConstant();
-    const row=document.createElement('div'); row.className='constant-row';
-    const box=document.createElement('div'); box.className='constant-box';
+  // Constant box: shown when target active or dispMode>0
+  const showConst=targetActive||dispMode>0;
+  if(showConst){
+    const curConst=currentConstant();
+    const row=document.createElement('div');row.className='constant-row';
+    const box=document.createElement('div');box.className='constant-box';
 
-    const curEl=document.createElement('div'); curEl.className='constant-current';
-    curEl.textContent=String(currentConst);
+    const curEl=document.createElement('div');curEl.className='constant-current';
+    curEl.textContent=String(curConst);
 
-    const lblEl=document.createElement('div'); lblEl.className='constant-label';
+    const lblEl=document.createElement('div');lblEl.className='constant-label';
     lblEl.textContent='constant';
 
-    box.appendChild(curEl); box.appendChild(lblEl);
+    box.appendChild(curEl);box.appendChild(lblEl);
 
     if(targetActive){
-      const tgtConst=computeTargetConstant();
-      if(currentConst===tgtConst) box.classList.add('const-matched');
-      const tgtEl=document.createElement('div'); tgtEl.className='constant-target';
-      tgtEl.textContent=String(tgtConst);
-      box.appendChild(tgtEl);
+      if(targetEditMode){
+        // Editable constant input
+        const kInput=document.createElement('input');
+        kInput.type='number';kInput.className='constant-k-input';
+        kInput.value=targetK;kInput.title='Target constant (k)';
+        kInput.addEventListener('input',()=>{
+          const v=parseInt(kInput.value);
+          targetK=isNaN(v)?0:v;
+          updateCongrats();
+          // update matched state on letters without full re-render
+          document.querySelectorAll('.letter-cell.matched').forEach(el=>{
+            // will be updated properly on next renderHasse
+          });
+        });
+        box.appendChild(kInput);
+      } else {
+        const tgtConst=targetConstant();
+        if(curConst===tgtConst)box.classList.add('const-matched');
+        const tgtEl=document.createElement('div');tgtEl.className='constant-target';
+        tgtEl.textContent=String(tgtConst);
+        box.appendChild(tgtEl);
+      }
     }
-    row.appendChild(box); hasse.appendChild(row);
+
+    row.appendChild(box);hasse.appendChild(row);
   }
 
   for(const layer of layeredMasks()){
-    const rowEl=document.createElement('div'); rowEl.className='hasse-layer';
-    for(const mask of layer) rowEl.appendChild(makeBoxEl(mask));
+    const rowEl=document.createElement('div');rowEl.className='hasse-layer';
+    for(const mask of layer)rowEl.appendChild(makeBoxEl(mask));
     hasse.appendChild(rowEl);
   }
 }
 
 function makeBoxEl(mask){
-  const box=document.createElement('div'); box.className='subset-box';
-  const isSource=(selSource===mask), isTarget=isValidTarget(mask);
-  if(isSource) box.classList.add('is-source');
+  const box=document.createElement('div');box.className='subset-box';
+  const isSource=(selSource===mask),isTarget=isValidTarget(mask);
+  if(isSource)box.classList.add('is-source');
   if(isTarget){
     box.classList.add('is-target');
     box.addEventListener('click',()=>handleTargetBoxClick(mask));
@@ -863,39 +1036,39 @@ function makeBoxEl(mask){
     box.addEventListener('mouseleave',clearHoverPreview);
   }
 
-  const cols=document.createElement('div'); cols.className='letter-cols';
+  const cols=document.createElement('div');cols.className='letter-cols';
   for(const li of maskLetterIndices(mask)){
-    const col=document.createElement('div'); col.className='letter-col';
+    const col=document.createElement('div');col.className='letter-col';
 
     // Coefficient cell
     const coeff=document.createElement('span');
-    coeff.className='coeff-cell'; coeff.id=`cc-${mask}-${li}`;
-    const val=getDisplayCoeff(mask,li);
+    coeff.className='coeff-cell';coeff.id=`cc-${mask}-${li}`;
+    const val=dispCoeff(mask,li);
     if(isTouched(mask,li)){
       coeff.textContent=String(val);
-      if(val>0) coeff.classList.add('coeff-pos');
-      else if(val<0) coeff.classList.add('coeff-neg');
+      if(val>0)coeff.classList.add('coeff-pos');
+      else if(val<0)coeff.classList.add('coeff-neg');
       else coeff.classList.add('coeff-zero');
     }
 
     // Letter cell
-    const letter=document.createElement('span'); letter.className='letter-cell';
+    const letter=document.createElement('span');letter.className='letter-cell';
     letter.textContent=alts[li];
-    if(selLetter===li&&selSource===mask) letter.classList.add('is-active');
-    if(targetActive&&isMatched(mask,li)) letter.classList.add('matched');
+    if(selLetter===li&&selSource===mask)letter.classList.add('is-active');
+    if(targetActive&&isMatched(mask,li))letter.classList.add('matched');
     letter.addEventListener('click',e=>{
-      e.stopPropagation(); handleLetterClick(mask,li,e.ctrlKey||e.metaKey);
+      e.stopPropagation();handleLetterClick(mask,li,e.ctrlKey||e.metaKey);
     });
 
-    col.appendChild(coeff); col.appendChild(letter);
+    col.appendChild(coeff);col.appendChild(letter);
 
-    // Target cell (only when target mode is on)
+    // Target cell
     if(targetActive||targetEditMode){
       if(targetEditMode){
         const inp=document.createElement('input');
-        inp.type='number'; inp.className='target-input-cell';
+        inp.type='number';inp.className='target-input-cell';
         const tv=getTargetCoeff(mask,li);
-        inp.value=tv!==0?tv:''; inp.placeholder='0';
+        inp.value=tv!==0?tv:'';inp.placeholder='0';
         inp.addEventListener('input',()=>{
           const v=parseInt(inp.value);
           setTargetCoeff(mask,li,isNaN(v)?0:v);
@@ -903,10 +1076,10 @@ function makeBoxEl(mask){
           updateCongrats();
         });
         col.appendChild(inp);
-      } else {
-        const tv=getDisplayTargetCoeff(mask,li);
-        const tCell=document.createElement('div'); tCell.className='target-cell';
-        if(tv!==0){ tCell.textContent=String(tv); tCell.classList.add('has-target'); }
+      }else{
+        const tv=dispTargetCoeff(mask,li);
+        const tCell=document.createElement('div');tCell.className='target-cell';
+        if(tv!==0){tCell.textContent=String(tv);tCell.classList.add('has-target');}
         col.appendChild(tCell);
       }
     }
@@ -917,106 +1090,127 @@ function makeBoxEl(mask){
   return box;
 }
 
-function renderSidebar(){ renderHint(); renderActionsList(); }
+function renderSidebar(){renderHint();renderActionsList();}
+
 function renderHint(){
-  const hintBar=document.getElementById('hint-bar');
+  // Sidebar hint box
   const hintBox=document.getElementById('selection-hint');
   if(selLetter!==null){
-    hintBar.textContent='Click an orange box to apply the BM action';
-    hintBar.classList.add('selecting');
     hintBox.style.display='';
     hintBox.innerHTML=
       `<strong>${alts[selLetter]}</strong> selected in {${maskToStr(selSource)}}<br>`+
       `Click any <span style="color:#d07000;font-weight:bold;">highlighted</span> superset `+
-      `to apply q<sub>T</sub>(${alts[selLetter]}, {${maskToStr(selSource)}}).<br><br>`+
-      `<button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;" onclick="cancelSelection()">Cancel</button>`;
-  } else {
-    hintBar.textContent='Click a letter inside any box to begin';
-    hintBar.classList.remove('selecting'); hintBox.style.display='none';
+      `to apply q<sub>T</sub>(${alts[selLetter]}, {${maskToStr(selSource)}}).`;
+  }else{
+    hintBox.style.display='none';
   }
 }
 
 function renderActionsList(){
-  const list=document.getElementById('actions-list'); list.innerHTML='';
+  const list=document.getElementById('actions-list');list.innerHTML='';
   if(actions.length===0){
-    const msg=document.createElement('p'); msg.className='no-actions-msg';
-    msg.textContent='No actions yet.'; list.appendChild(msg);
+    const msg=document.createElement('p');msg.className='no-actions-msg';
+    msg.textContent='No actions yet.';list.appendChild(msg);
   }
   for(let idx=0;idx<actions.length;idx++){
-    const {raw,parsed}=actions[idx];
+    const{raw,parsed}=actions[idx];
     const hasError=!parsed&&raw.trim()!=='';
     const item=document.createElement('div');
-    item.className='action-item'+(hasError?' has-error':''); item.dataset.idx=idx;
+    item.className='action-item'+(hasError?' has-error':'');item.dataset.idx=idx;
     const input=document.createElement('input');
-    input.type='text'; input.className='action-input'; input.value=raw;
+    input.type='text';input.className='action-input';input.value=raw;
     input.addEventListener('input',()=>handleActionEdit(idx,input.value));
     input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();focusNewActionInput();}});
     const errIcon=document.createElement('span');
-    errIcon.className='action-error-icon'; errIcon.textContent='⚠'; errIcon.title='Invalid — not applied';
+    errIcon.className='action-error-icon';errIcon.textContent='⚠';errIcon.title='Invalid — not applied';
     const removeBtn=document.createElement('button');
-    removeBtn.className='btn-danger'; removeBtn.textContent='×';
-    removeBtn.title='Remove'; removeBtn.addEventListener('click',()=>doUndoAction(idx));
-    item.appendChild(input); item.appendChild(errIcon); item.appendChild(removeBtn);
+    removeBtn.className='btn-danger';removeBtn.textContent='×';
+    removeBtn.title='Remove';removeBtn.addEventListener('click',()=>doUndoAction(idx));
+    item.appendChild(input);item.appendChild(errIcon);item.appendChild(removeBtn);
     list.appendChild(item);
   }
-  const newWrap=document.createElement('div'); newWrap.className='new-action-row';
+  const newWrap=document.createElement('div');newWrap.className='new-action-row';
   const newInput=document.createElement('input');
-  newInput.type='text'; newInput.id='new-action-input';
-  newInput.className='new-action-input'; newInput.placeholder='e.g.  a: {a} → {abc}';
+  newInput.type='text';newInput.id='new-action-input';
+  newInput.className='new-action-input';newInput.placeholder='e.g.  a: {a} → {abc}';
   newInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();handleNewActionSubmit(newInput);}});
-  newInput.addEventListener('blur',()=>{if(newInput.value.trim()) handleNewActionSubmit(newInput);});
-  newWrap.appendChild(newInput); list.appendChild(newWrap);
+  newInput.addEventListener('blur',()=>{if(newInput.value.trim())handleNewActionSubmit(newInput);});
+  newWrap.appendChild(newInput);list.appendChild(newWrap);
 }
 
 function handleActionEdit(idx,newRaw){
-  actions[idx].raw=newRaw; actions[idx].parsed=parseActionText(newRaw);
+  actions[idx].raw=newRaw;actions[idx].parsed=parseActionText(newRaw);
   const item=document.querySelector(`.action-item[data-idx="${idx}"]`);
-  if(item) item.classList.toggle('has-error',!actions[idx].parsed&&newRaw.trim()!=='');
-  recomputeAll(); renderHasse(); renderChoiceLatex(); renderBMLatex(); updateCongrats();
-  _updatingCode=true; document.getElementById('save-code').value=generateCode(); _updatingCode=false;
+  if(item)item.classList.toggle('has-error',!actions[idx].parsed&&newRaw.trim()!=='');
+  recomputeAll();renderHasse();renderChoiceLatex();renderBMLatex();updateCongrats();
+  _updatingCode=true;document.getElementById('save-code').value=generateCode();_updatingCode=false;
 }
 function handleNewActionSubmit(inputEl){
-  const raw=inputEl.value.trim(); if(!raw) return;
+  const raw=inputEl.value.trim();if(!raw)return;
   actions.push({raw,parsed:parseActionText(raw)});
-  recomputeAll(); renderAll();
-  const ni=document.getElementById('new-action-input'); if(ni) ni.focus();
+  recomputeAll();renderAll();
+  const ni=document.getElementById('new-action-input');if(ni)ni.focus();
 }
 function focusNewActionInput(){
-  const ni=document.getElementById('new-action-input'); if(ni) ni.focus();
+  const ni=document.getElementById('new-action-input');if(ni)ni.focus();
 }
 
 function handleSaveCodeInput(){
-  if(_updatingCode) return;
+  if(_updatingCode)return;
   const raw=document.getElementById('save-code').value;
   const statusEl=document.getElementById('save-code-status');
   const ta=document.getElementById('save-code');
-  if(!raw.trim()){ ta.classList.remove('parse-error'); statusEl.textContent=''; return; }
-  const parsed=parseCode(raw.trim());
-  if(!parsed){ ta.classList.add('parse-error'); statusEl.textContent='⚠ Invalid save code'; }
-  else {
+  if(!raw.trim()){ta.classList.remove('parse-error');statusEl.textContent='';return;}
+  const parsed=parseSaveCode(raw.trim());
+  if(!parsed){ta.classList.add('parse-error');statusEl.textContent='⚠ Invalid save code';}
+  else{
     ta.classList.remove('parse-error');
     statusEl.textContent=`✓ Loaded N=${parsed.n}, ${parsed.actions.length} action(s)`;
     statusEl.style.color='#2a8a5a';
-    initGame(parsed.n,parsed.actions); updateTitle();
-    renderHasse(); renderSidebar(); renderChoiceLatex(); renderBMLatex(); updateCongrats();
-    _updatingCode=true; ta.value=generateCode(); _updatingCode=false;
+    initGame(parsed.n,parsed.actions);updateTitle();
+    renderHasse();renderSidebar();renderChoiceLatex();renderBMLatex();updateCongrats();
+    _updatingCode=true;ta.value=generateCode();_updatingCode=false;
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  COPY HELPERS
+// ═══════════════════════════════════════════════════════════
 function copyPanel(taId,btnId,origLabel,doneLabel){
-  const text=document.getElementById(taId).value, btn=document.getElementById(btnId);
+  const text=document.getElementById(taId).value;
+  const btn=document.getElementById(btnId);
   navigator.clipboard.writeText(text).catch(()=>{
-    const ta=document.getElementById(taId); ta.select(); ta.setSelectionRange(0,99999);
+    const ta=document.getElementById(taId);ta.select();ta.setSelectionRange(0,99999);
     document.execCommand('copy');
   });
-  btn.textContent=doneLabel; btn.classList.add('copied');
+  btn.textContent=doneLabel;btn.classList.add('copied');
   setTimeout(()=>{btn.textContent=origLabel;btn.classList.remove('copied');},1800);
 }
 
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') cancelSelection(); });
+function copyChoiceConfig(){
+  const text=generateChoiceConfig();
+  const btn=document.getElementById('btn-copy-config');
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  btn.textContent='✓';btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent='Config';btn.classList.remove('copied');},1800);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  KEYBOARD + INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{if(e.key==='Escape')cancelSelection();});
 document.getElementById('save-code').addEventListener('input',handleSaveCodeInput);
 
-initGame(4,null); updateTitle(); renderTargetArea(); renderAll();
+initGame(4,null);
+updateTitle();
+setDispMode(1); // initialize mode badge + buttons
+renderRightBar();
+renderTargetEditBar();
+renderAll();
 </script>
 </body>
 </html>
