@@ -533,12 +533,8 @@ function parseConfigCode(raw){
     if(!newTarget[mask])newTarget[mask]={};
     newTarget[mask][li]=val;
   }
-  if(k!==0){
-    const X=(1<<n)-1;
-    if(!newTarget[X])newTarget[X]={};
-    for(let x=0;x<n;x++)newTarget[X][x]=(newTarget[X][x]||0)+k;
-  }
-  return{n,targetCoeffs:newTarget,targetK:0};
+  // k is a separate constant term; do NOT fold it into the stored coefficients
+  return{n,targetCoeffs:newTarget,targetK:k};
 }
 
 function parseChoiceLatex(text){
