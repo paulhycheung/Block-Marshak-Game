@@ -112,8 +112,8 @@
       border: 2px solid #c8c2b8; border-radius: 9px; background: #f5f5f0;
       padding: 3px 14px 4px; gap: 1px; min-width: 72px;
     }
-    .constant-box.const-matched { border-color: #2a7a3a; background: #f0fff0; }
     .constant-current { font-size: 1rem; font-weight: bold; color: #333; min-height: 1.1em; line-height: 1; }
+    .constant-current.unmatched { color: #c0392b; }
     .constant-label { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
     .constant-target { font-size: 0.85rem; color: #888; font-style: italic; min-height: 1em; line-height: 1; }
     .constant-k-input {
@@ -173,8 +173,8 @@
     }
     .letter-cell:hover     { color: #d07000; }
     .letter-cell.is-active { color: #d07000; }
-    /* matched = normal black (no special styling); unmatched = red */
-    .letter-cell.unmatched { color: #c0392b; }
+    /* matched = normal black (no special styling); unmatched = red bold */
+    .letter-cell.unmatched { color: #c0392b; font-weight: bold; }
     #hasse.selecting-mode .letter-cell:hover:not(.is-active) { color: #222; }
 
     /* ── Target cells ── */
@@ -1015,7 +1015,7 @@ function renderHasse(){
         box.appendChild(kInput);
       } else {
         const tgtConst=targetConstant();
-        if(curConst===tgtConst)box.classList.add('const-matched');
+        if(curConst!==tgtConst)curEl.classList.add('unmatched');
         const tgtEl=document.createElement('div');tgtEl.className='constant-target';
         tgtEl.textContent=String(tgtConst);
         box.appendChild(tgtEl);
