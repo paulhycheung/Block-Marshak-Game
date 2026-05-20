@@ -922,9 +922,10 @@ function generateLatex(){
       const ta=maskToStr(a.T),tb=maskToStr(b.T);return ta<tb?-1:ta>tb?1:0;
     });
   }
-  return entries.map(({x,S,T,count})=>
-    `${count>1?count:''}q_{${maskToStr(T)}}(${alts[x]},${maskToStr(S)})`
-  ).join(' + ');
+  return entries.map(({x,S,T,count})=>{
+    const qSub=T===((1<<N)-1)?'':`_{${maskToStr(T)}}`;
+    return`${count>1?count:''}q${qSub}(${alts[x]},${maskToStr(S)})`;
+  }).join(' + ');
 }
 
 function generateChoiceLatex(){
