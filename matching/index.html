@@ -66,39 +66,33 @@
       border-radius: 6px; padding: 0.2rem 0.55rem;
     }
 
-    /* ── Target edit bar (below topbar) ── */
-    #target-edit-bar {
-      display: none; flex-shrink: 0;
-      background: #fffdf5; border: 1.5px solid #f0d090;
-      border-radius: 8px; padding: 0.5rem 0.75rem;
-      align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    /* ── Inline target input (lives inside #right-bar when editing) ── */
+    .target-inline-input {
+      font-size: 0.79rem; font-family: monospace;
+      padding: 0.22rem 0.5rem; border: 1.5px solid #ccc; border-radius: 6px;
+      background: white; width: 300px;
     }
-    #target-edit-bar.visible { display: flex; }
-    #target-paste-input {
-      flex: 1; min-width: 200px;
-      padding: 0.25rem 0.55rem; font-size: 0.79rem; font-family: monospace;
-      border: 1.5px solid #ccc; border-radius: 6px; background: white;
-    }
-    #target-paste-input:focus { outline: none; border-color: #4a7bbd; }
-    #target-paste-input.parse-ok  { border-color: #2a7a3a; background: #f0fff0; }
-    #target-paste-input.parse-err { border-color: #c0392b; background: #fff5f5; }
-    #target-paste-status { font-size: 0.76rem; }
+    .target-inline-input:focus { outline: none; border-color: #4a7bbd; }
+    .target-inline-input.parse-ok  { border-color: #2a7a3a; background: #f0fff0; }
+    .target-inline-input.parse-err { border-color: #c0392b; background: #fff5f5; }
+    #target-paste-status { font-size: 0.72rem; }
 
     /* ── Expression bar (target choice expression, shown when target locked) ── */
     #expr-bar {
       display: none; flex-shrink: 0;
       background: #f0f5ff; border: 1.5px solid #c0d0e8;
       border-radius: 8px; padding: 0.38rem 0.75rem;
-      align-items: center; gap: 0.5rem;
+      align-items: flex-start; gap: 0.5rem;
     }
     #expr-bar.visible { display: flex; }
-    #expr-bar-label { font-size: 0.74rem; color: #557; white-space: nowrap; flex-shrink: 0; }
+    #expr-bar-label { font-size: 0.74rem; color: #557; white-space: nowrap; flex-shrink: 0; padding-top: 0.22rem; }
     #expr-bar-text {
-      flex: 1; min-width: 0;
+      flex: 1; min-width: 0; height: 42px; resize: none;
       padding: 0.2rem 0.5rem; font-size: 0.79rem; font-family: monospace;
       border: 1.5px solid #c0d0e8; border-radius: 6px;
-      background: #fafbff; color: #333;
+      background: #fafbff; color: #333; line-height: 1.4;
     }
+    #expr-bar-btns { display: flex; flex-direction: column; gap: 0.25rem; flex-shrink: 0; }
 
     /* ── Display mode bar (bottom-left) ── */
     #disp-mode-bar {
@@ -322,22 +316,14 @@
     <div id="right-bar"></div>
   </div>
 
-  <!-- Target edit bar (paste / manual entry controls) -->
-  <div id="target-edit-bar">
-    <input id="target-paste-input" type="text"
-           placeholder="Paste config code (N|std|rep|cores|k|…) or Choice LaTeX (p(a,\,ab)+…±k)"
-           oninput="handleTargetPaste(this.value)">
-    <span id="target-paste-status"></span>
-    <button class="btn-primary" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="finishTargetSetup()">Done</button>
-    <button class="btn-ghost"   style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>
-  </div>
-
   <!-- Target expression bar (shown after target is locked) -->
   <div id="expr-bar">
     <span id="expr-bar-label">Target:</span>
-    <input id="expr-bar-text" type="text" readonly>
-    <button class="btn-copy-sm" id="btn-expr-copy" onclick="copyExprBar()">Copy</button>
-    <button class="btn-copy-sm green" id="btn-expr-config" onclick="copyExprConfig()">Config</button>
+    <textarea id="expr-bar-text" readonly></textarea>
+    <div id="expr-bar-btns">
+      <button class="btn-copy-sm" id="btn-expr-copy" onclick="copyExprBar()">Copy</button>
+      <button class="btn-copy-sm green" id="btn-expr-config" onclick="copyExprConfig()">Config</button>
+    </div>
   </div>
 
   <div id="hasse"></div>
@@ -620,11 +606,16 @@ function applyParsedTarget(result){
 // ═══════════════════════════════════════════════════════════
 function renderRightBar(){
   const rb=document.getElementById('right-bar');
-  // Always show Set Target / target badge — selection hint is in bottom-hint-bar
   if(!targetActive&&!targetEditMode){
     rb.innerHTML=`<button class="btn-set-target" onclick="enterTargetMode()">Set Target</button>`;
   } else if(targetEditMode){
-    rb.innerHTML=`<span style="font-size:0.79rem;color:#9a6800;">Setting target…</span>`;
+    // Inline paste input replaces the button in-place
+    rb.innerHTML=
+      `<input id="target-paste-input" type="text" class="target-inline-input"`+
+      ` placeholder="Config code or Choice LaTeX…" oninput="handleTargetPaste(this.value)">`+
+      `<span id="target-paste-status"></span>`+
+      `<button class="btn-primary" style="font-size:0.79rem;padding:0.24rem 0.65rem;" onclick="finishTargetSetup()">Done</button>`+
+      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.24rem 0.65rem;" onclick="clearTarget()">Clear</button>`;
   } else {
     rb.innerHTML=
       `<span class="target-set-badge">▶ Target set</span>`+
@@ -633,38 +624,29 @@ function renderRightBar(){
   }
 }
 
-function renderTargetEditBar(){
-  const bar=document.getElementById('target-edit-bar');
-  if(targetEditMode){bar.classList.add('visible');}
-  else{bar.classList.remove('visible');}
-}
-
 function enterTargetMode(){
-  // Cancel any pending selection before entering target mode
   selLetter=null;selSource=null;
   targetActive=true;targetEditMode=true;
-  const inp=document.getElementById('target-paste-input');
-  if(inp){inp.value='';inp.classList.remove('parse-ok','parse-err');}
-  document.getElementById('target-paste-status').textContent='';
-  renderRightBar();renderTargetEditBar();
+  renderRightBar();renderExprBar();
   renderHasse();updateCongrats();
+  // Focus the newly created input
+  const inp=document.getElementById('target-paste-input');
+  if(inp)inp.focus();
 }
 function finishTargetSetup(){
   targetEditMode=false;
-  renderRightBar();renderTargetEditBar();renderExprBar();
+  renderRightBar();renderExprBar();
   renderHasse();updateCongrats();
 }
 function clearTarget(){
   targetCoeffs={};targetK=0;targetActive=false;targetEditMode=false;
-  const inp=document.getElementById('target-paste-input');
-  if(inp){inp.value='';inp.classList.remove('parse-ok','parse-err');}
-  document.getElementById('target-paste-status').textContent='';
-  renderRightBar();renderTargetEditBar();renderAll();
+  renderRightBar();renderExprBar();renderAll();
 }
 
 function handleTargetPaste(raw){
   const inp=document.getElementById('target-paste-input');
   const statusEl=document.getElementById('target-paste-status');
+  if(!inp||!statusEl)return;
   if(!raw.trim()){
     inp.classList.remove('parse-ok','parse-err');
     statusEl.textContent='';
@@ -673,15 +655,14 @@ function handleTargetPaste(raw){
   const result=parseInputAsTarget(raw);
   if(!result){
     inp.classList.remove('parse-ok');inp.classList.add('parse-err');
-    statusEl.textContent='⚠ Unrecognised format';
+    statusEl.textContent='⚠ Unrecognised';
     statusEl.style.color='#c0392b';
   } else {
     inp.classList.remove('parse-err');inp.classList.add('parse-ok');
     const ok=applyParsedTarget(result);
     if(ok){
-      statusEl.textContent=`✓ Loaded (N=${result.n})`;
-      statusEl.style.color='#2a8a5a';
-      renderRightBar();renderTargetEditBar();renderHasse();updateCongrats();
+      // applyParsedTarget sets targetEditMode=false; rebuild right-bar and show expr-bar
+      renderRightBar();renderExprBar();renderHasse();updateCongrats();
       renderChoiceLatex();
     }
   }
@@ -829,7 +810,18 @@ function handleNChange(val){
 // ═══════════════════════════════════════════════════════════
 //  INTERACTION
 // ═══════════════════════════════════════════════════════════
-function handleLetterClick(mask,li,ctrlHeld){
+function handleLetterClick(mask,li,ctrlHeld,shiftHeld){
+  if(shiftHeld){
+    // Remove the most recent Ctrl+click action for this (letter, source set) → full set
+    const fullSet=(1<<N)-1;
+    for(let i=actions.length-1;i>=0;i--){
+      const a=actions[i];
+      if(a.parsed&&a.parsed.x===li&&a.parsed.S===mask&&a.parsed.T===fullSet){
+        actions.splice(i,1);recomputeAll();renderAll();return;
+      }
+    }
+    return;
+  }
   if(ctrlHeld){
     const T=(1<<N)-1;selLetter=null;selSource=null;
     actions.push({raw:actionToText(li,mask,T),parsed:{x:li,S:mask,T}});
@@ -913,7 +905,7 @@ function generateLatex(){
     });
   }
   return entries.map(({x,S,T,count})=>
-    `${count>1?count:''}q_{${maskToStr(T)}}(${alts[x]},\\,${maskToStr(S)})`
+    `${count>1?count:''}q_{${maskToStr(T)}}(${alts[x]},${maskToStr(S)})`
   ).join(' + ');
 }
 
@@ -935,7 +927,7 @@ function generateChoiceLatex(){
   });
   if(!pTerms.length&&constant===0)return'0';
   const allParts=[
-    ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},\\,${maskToStr(mask)})`})),
+    ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},${maskToStr(mask)})`})),
     ...(constant!==0?[{val:constant,str:''}]:[])
   ];
   if(!allParts.length)return'0';
@@ -985,7 +977,7 @@ function generateTargetChoiceLatex(){
     const sa=maskToStr(a.mask),sb=maskToStr(b.mask);return sa<sb?-1:sa>sb?1:0;
   });
   const allParts=[
-    ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},\\,${maskToStr(mask)})`})),
+    ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},${maskToStr(mask)})`})),
     ...(constant!==0?[{val:constant,str:''}]:[])
   ];
   if(!allParts.length)return'0';
@@ -1172,7 +1164,7 @@ function makeBoxEl(mask){
       if(!isMatched(mask,li))letter.classList.add('unmatched');
     }
     letter.addEventListener('click',e=>{
-      e.stopPropagation();handleLetterClick(mask,li,e.ctrlKey||e.metaKey);
+      e.stopPropagation();handleLetterClick(mask,li,e.ctrlKey||e.metaKey,e.shiftKey);
     });
 
     col.appendChild(coeff);col.appendChild(letter);
@@ -1340,7 +1332,6 @@ updateTitle();
 setDispMode(1);
 setBMSort('alpha');
 renderRightBar();
-renderTargetEditBar();
 renderAll();
 </script>
 </body>
