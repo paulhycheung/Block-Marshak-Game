@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Block-Marshak Matching</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #f0ede8;
+      height: 100vh;
+      overflow: hidden;
+      color: #222;
+      display: flex;
+      flex-direction: row;
+    }
+
+    button {
+      padding: 0.45rem 1.1rem;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: background 0.15s, transform 0.08s;
+    }
+    button:active { transform: scale(0.96); }
+    .btn-primary { background: #4a7bbd; color: white; }
+    .btn-primary:hover { background: #3869aa; }
+    .btn-ghost { background: #ebebeb; color: #444; }
+    .btn-ghost:hover { background: #ddd; }
+    .btn-danger {
+      background: none; border: 1.5px solid #c0392b; color: #c0392b;
+      border-radius: 50%; width: 22px; height: 22px; padding: 0;
+      font-size: 0.9rem; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0;
+    }
+    .btn-danger:hover { background: #c0392b; color: white; }
+
+    #diagram-area {
+      flex: 1;
+      min-width: 0;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 1.2rem;
+      gap: 0.6rem;
+    }
+
+    .diagram-topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .n-selector-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.88rem;
+      color: #555;
+    }
+    .n-selector-wrap select {
+      font-size: 0.88rem;
+      font-family: 'Georgia', serif;
+      border: 1.5px solid #ccc;
+      border-radius: 6px;
+      padding: 0.22rem 0.45rem;
+      background: white;
+      cursor: pointer;
+    }
+    .n-selector-wrap select:focus { outline: none; border-color: #4a7bbd; }
+
+    #diagram-title { font-size: 1rem; color: #555; font-weight: normal; }
+    #hint-bar { font-size: 0.82rem; color: #888; font-style: italic; margin-left: auto; }
+    #hint-bar.selecting { color: #c06000; font-style: normal; font-weight: bold; }
+
+    /* ── Target area ── */
+    #target-area { display: flex; align-items: center; gap: 0.35rem; }
+    #target-input {
+      width: 240px; padding: 0.22rem 0.5rem;
+      font-size: 0.79rem; font-family: monospace;
+      border: 1.5px solid #ccc; border-radius: 6px; background: white;
+    }
+    #target-input:focus { outline: none; border-color: #4a7bbd; }
+    #target-input.parse-ok  { border-color: #2a7a3a; background: #f0fff0; }
+    #target-input.parse-err { border-color: #c0392b; background: #fff5f5; }
+
+    /* ── Simplified toggle bar ── */
+    #simplified-bar {
+      display: flex; align-items: center; gap: 0.6rem;
+      font-size: 0.8rem; color: #666; flex-shrink: 0;
+    }
+    #simplified-bar label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+
+    /* ── Hasse ── */
+    #hasse {
+      display: flex; flex-direction: column; gap: 1.2rem;
+      align-items: center; flex: 1; justify-content: center; min-height: 0;
+    }
+    .hasse-layer { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+
+    /* ── Constant box ── */
+    .constant-row { display: flex; justify-content: center; }
+    .constant-box {
+      display: flex; flex-direction: column; align-items: center;
+      border: 2px solid #c8c2b8; border-radius: 9px; background: #f5f5f0;
+      padding: 3px 14px 4px; gap: 1px; min-width: 72px;
+    }
+    .constant-box.const-matched { border-color: #2a7a3a; background: #f0fff0; }
+    .constant-current { font-size: 1rem; font-weight: bold; color: #333; min-height: 1.1em; line-height: 1; }
+    .constant-label { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
+    .constant-target { font-size: 0.85rem; color: #888; font-style: italic; min-height: 1em; line-height: 1; }
+
+    /* ── Expanded BM panel ── */
+    #bm-expanded {
+      border-top: 2px solid #e4e0d8; background: white;
+      border-radius: 8px 8px 0 0; padding: 0.7rem 1rem 0.8rem; flex-shrink: 0;
+    }
+    #bm-expanded-header {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 0.55rem; flex-wrap: wrap;
+    }
+    #bm-expanded-header strong { font-size: 0.85rem; color: #555; }
+    .sort-options { display: flex; gap: 1rem; font-size: 0.8rem; color: #555; }
+    .sort-options label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    #latex-code-expanded {
+      width: 100%; height: 78px; font-family: monospace; font-size: 0.73rem;
+      border: 1.5px solid #ddd; border-radius: 7px;
+      padding: 0.4rem 0.5rem; resize: vertical;
+      background: #fafaf8; color: #333; display: block;
+    }
+
+    /* ── Subset box ── */
+    .subset-box {
+      display: inline-flex; flex-direction: column; align-items: center;
+      border: 2px solid #c8c2b8; border-radius: 9px; background: white;
+      padding: 3px 5px 4px;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    .subset-box.is-source { border-color: #4a7bbd; background: #f0f5ff; box-shadow: 0 0 0 3px rgba(74,123,189,0.18); }
+    .subset-box.is-target { border-color: #d07000; background: #fff9f0; box-shadow: 0 0 10px rgba(208,112,0,0.25); cursor: pointer; }
+    .subset-box.is-target:hover { background: #fff2d8; box-shadow: 0 0 14px rgba(208,112,0,0.40); }
+
+    .letter-cols { display: flex; }
+    .letter-col  { display: flex; flex-direction: column; align-items: center; }
+
+    .coeff-cell {
+      font-size: 1rem; font-weight: bold; text-align: center; line-height: 1;
+      user-select: none; pointer-events: none;
+      min-width: 0.6rem; padding: 0 1px; min-height: 1.1em;
+    }
+    .coeff-pos   { color: #2178b4; }
+    .coeff-neg   { color: #8b1a1a; }
+    .coeff-zero  { color: #111; }
+    .coeff-cell.coeff-preview           { opacity: 0.42; }
+    .coeff-cell.coeff-preview.coeff-pos { color: #2178b4; }
+    .coeff-cell.coeff-preview.coeff-neg { color: #8b1a1a; }
+    .coeff-cell.coeff-preview.coeff-zero{ color: #555; }
+
+    .letter-cell {
+      text-align: center; font-size: 1rem; padding: 1px 1px;
+      border-radius: 4px; cursor: pointer; user-select: none;
+      line-height: 1.35; transition: color 0.1s; color: #222;
+    }
+    .letter-cell:hover     { color: #d07000; }
+    .letter-cell.is-active { color: #d07000; }
+    .letter-cell.matched   { color: #2a7a3a; font-weight: bold; }
+    #hasse.selecting-mode .letter-cell:hover:not(.is-active) { color: #222; }
+
+    /* ── Target cells ── */
+    .target-cell {
+      min-height: 1em; font-size: 0.78rem; text-align: center;
+      color: #aaa; line-height: 1; padding: 0 1px;
+      user-select: none; pointer-events: none;
+    }
+    .target-cell.has-target { color: #777; }
+    .target-input-cell {
+      width: 28px; height: 18px;
+      font-size: 0.72rem; text-align: center;
+      border: 1px solid #bbb; border-radius: 3px;
+      padding: 0 2px; background: #f9f9f9;
+      font-family: monospace; pointer-events: all;
+    }
+    .target-input-cell:focus { outline: none; border-color: #4a7bbd; background: white; }
+
+    /* ── Congratulations ── */
+    #congrats {
+      display: none; text-align: center; padding: 0.6rem 1rem;
+      font-size: 1rem; color: #2a7a3a; font-weight: bold;
+      background: #f0fff0; border-radius: 8px;
+      border: 2px solid #2a7a3a; flex-shrink: 0;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 280px; background: white;
+      border-left: 2px solid #e4e0d8;
+      display: flex; flex-direction: column;
+      overflow: hidden; flex-shrink: 0;
+    }
+    #actions-panel {
+      flex: 1; overflow-y: auto; padding: 1rem;
+      display: flex; flex-direction: column; gap: 0.6rem; min-height: 0;
+    }
+    #actions-panel h3 {
+      font-size: 0.95rem; color: #333;
+      padding-bottom: 0.5rem; border-bottom: 1px solid #eee; flex-shrink: 0;
+    }
+    .selection-hint-box {
+      background: #fff8ec; border: 1px solid #f0d090; border-radius: 8px;
+      padding: 0.6rem 0.75rem; font-size: 0.82rem; color: #7a4800; line-height: 1.5;
+    }
+    .selection-hint-box strong { color: #c06000; }
+    .action-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid #f5f3f0; }
+    .action-input {
+      flex: 1; min-width: 0; border: 1.5px solid #ddd; border-radius: 5px;
+      padding: 0.22rem 0.4rem; font-family: monospace; font-size: 0.78rem;
+      color: #333; background: white; transition: border-color 0.15s;
+    }
+    .action-input:focus { outline: none; border-color: #4a7bbd; }
+    .action-item.has-error .action-input { border-color: #c0392b; background: #fff5f5; }
+    .action-error-icon { display: none; color: #c0392b; font-size: 0.9rem; flex-shrink: 0; }
+    .action-item.has-error .action-error-icon { display: inline; }
+    .new-action-row { padding: 0.4rem 0 0.1rem; }
+    .new-action-input {
+      width: 100%; border: 1.5px dashed #bbb; border-radius: 5px;
+      padding: 0.28rem 0.4rem; font-family: monospace; font-size: 0.78rem;
+      color: #999; background: #fafafa;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .new-action-input:focus { outline: none; border-color: #4a7bbd; border-style: solid; background: white; color: #333; }
+    .no-actions-msg { color: #bbb; font-size: 0.85rem; font-style: italic; }
+
+    .sidebar-panel {
+      padding: 0.65rem 1rem; border-top: 2px solid #e4e0d8;
+      display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0;
+    }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; }
+    .panel-header h4 { font-size: 0.85rem; color: #666; }
+    .btn-expand {
+      background: none; border: 1px solid #ddd; border-radius: 4px;
+      padding: 0.08rem 0.3rem; font-size: 0.82rem; color: #999; line-height: 1; cursor: pointer;
+    }
+    .btn-expand:hover { background: #f0f0f0; color: #555; }
+    .panel-textarea {
+      width: 100%; height: 56px; font-family: monospace; font-size: 0.73rem;
+      border: 1.5px solid #ddd; border-radius: 7px;
+      padding: 0.38rem 0.5rem; resize: none;
+      background: #fafaf8; color: #333; transition: border-color 0.15s;
+    }
+    .panel-textarea:focus { outline: none; border-color: #4a7bbd; }
+    #save-code { background: white; }
+    #save-code.parse-error { border-color: #c0392b; background: #fff5f5; }
+    #save-code-status { font-size: 0.71rem; color: #c0392b; min-height: 1em; }
+    .btn-copy-sm {
+      background: #4a7bbd; color: white;
+      padding: 0.18rem 0.55rem; font-size: 0.72rem; border-radius: 5px;
+    }
+    .btn-copy-sm:hover { background: #3869aa; }
+    .btn-copy-sm.copied { background: #2a8a5a; }
+    #btn-copy-config:hover, #btn-copy-config-simp:hover { background: #4d7040 !important; }
+    #btn-copy-config.copied, #btn-copy-config-simp.copied { background: #2a8a5a !important; }
+  </style>
+</head>
+<body>
+
+<div id="diagram-area">
+  <div class="diagram-topbar">
+    <div class="n-selector-wrap">
+      N:
+      <select id="n-selector" onchange="handleNChange(this.value)">
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+      </select>
+    </div>
+    <div id="target-area"></div>
+    <h2 id="diagram-title"></h2>
+    <span id="hint-bar">Click a letter inside any box to begin</span>
+  </div>
+
+  <div id="simplified-bar">
+    <label>
+      <input type="checkbox" id="chk-simplified" onchange="handleSimplifiedToggle()">
+      Show Simplified
+    </label>
+  </div>
+
+  <div id="hasse"></div>
+
+  <div id="congrats">Congratulations! All values matched!</div>
+
+  <div id="bm-expanded" style="display:none">
+    <div id="bm-expanded-header">
+      <strong>BM — expanded</strong>
+      <div class="sort-options">
+        <label><input type="radio" name="bm-sort" value="alpha" checked onchange="renderBMLatex()"> Alphabetical</label>
+        <label><input type="radio" name="bm-sort" value="coeff" onchange="renderBMLatex()"> Coefficient first (↓)</label>
+      </div>
+      <button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-left:auto;" onclick="toggleExpandBM()">✕ Close</button>
+    </div>
+    <textarea id="latex-code-expanded" readonly></textarea>
+  </div>
+</div>
+
+<div id="sidebar">
+  <div id="actions-panel">
+    <h3>Actions</h3>
+    <div id="selection-hint" style="display:none" class="selection-hint-box"></div>
+    <div id="actions-list"><p class="no-actions-msg">No actions yet.</p></div>
+  </div>
+
+  <div class="sidebar-panel" id="choice-panel">
+    <div class="panel-header">
+      <h4>Choice</h4>
+      <button class="btn-copy-sm" id="btn-copy-choice" onclick="copyPanel('choice-code','btn-copy-choice','Copy','✓')">Copy</button>
+      <button class="btn-copy-sm" id="btn-copy-config" style="background:#6a8f5a;" onclick="copyConfigCode()">Config As Is</button>
+      <button class="btn-copy-sm" id="btn-copy-config-simp" style="background:#6a8f5a;" onclick="copyConfigSimpCode()">Config Simp</button>
+    </div>
+    <textarea id="choice-code" class="panel-textarea" readonly></textarea>
+  </div>
+
+  <div class="sidebar-panel" id="latex-panel">
+    <div class="panel-header">
+      <h4>BM</h4>
+      <button class="btn-copy-sm" id="btn-copy-latex" onclick="copyPanel('latex-code','btn-copy-latex','Copy','✓')">Copy</button>
+      <button class="btn-expand" id="btn-expand-bm" onclick="toggleExpandBM()" title="Expand below diagram">⤢</button>
+    </div>
+    <textarea id="latex-code" class="panel-textarea" readonly></textarea>
+  </div>
+
+  <div class="sidebar-panel" id="code-panel">
+    <div class="panel-header">
+      <h4>Save Code</h4>
+      <button class="btn-copy-sm" id="btn-copy-code" onclick="copyPanel('save-code','btn-copy-code','Copy','✓')">Copy</button>
+    </div>
+    <textarea id="save-code" class="panel-textarea" placeholder="Paste a save code here to load it…"></textarea>
+    <div id="save-code-status"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let N = 0, alts = [], coeffs = {}, touched = {}, actions = [];
+let selLetter = null, selSource = null;
+let _updatingCode = false, _bmExpanded = false;
+
+// Target state
+let targetCoeffs = {}, targetActive = false, targetEditMode = false;
+let showSimplified = false;
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════
+function popcount(n) { let c=0; while(n){c+=n&1;n>>>=1;} return c; }
+function maskLetterIndices(mask) {
+  const out=[]; for(let i=0;i<N;i++) if(mask&(1<<i)) out.push(i); return out;
+}
+function maskToStr(mask) { return maskLetterIndices(mask).map(i=>alts[i]).join(''); }
+function layeredMasks() {
+  const layers=[];
+  for(let size=N;size>=1;size--){
+    const row=[];
+    for(let m=1;m<(1<<N);m++) if(popcount(m)===size) row.push(m);
+    row.sort((a,b)=>{
+      const ia=maskLetterIndices(a),ib=maskLetterIndices(b);
+      for(let i=0;i<ia.length;i++) if(ia[i]!==ib[i]) return ia[i]-ib[i];
+      return 0;
+    });
+    layers.push(row);
+  }
+  return layers;
+}
+function getCoeff(mask,li) { return (coeffs[mask]&&coeffs[mask][li]!==undefined)?coeffs[mask][li]:0; }
+function isTouched(mask,li) { return !!(touched[mask]&&touched[mask].has(li)); }
+function isValidTarget(mask) {
+  if(selLetter===null||selSource===null) return false;
+  return (mask&selSource)===selSource;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TARGET HELPERS
+// ═══════════════════════════════════════════════════════════
+function getTargetCoeff(mask,li) {
+  return (targetCoeffs[mask]&&targetCoeffs[mask][li]!==undefined)?targetCoeffs[mask][li]:0;
+}
+function setTargetCoeff(mask,li,val) {
+  if(!targetCoeffs[mask]) targetCoeffs[mask]={};
+  targetCoeffs[mask][li]=val;
+}
+
+// minimum coefficient in a set (for simplified display)
+function setMin(mask, src) {
+  const letters=maskLetterIndices(mask);
+  if(!letters.length) return 0;
+  return Math.min(...letters.map(li=> src==='target'?getTargetCoeff(mask,li):getCoeff(mask,li)));
+}
+
+function getDisplayCoeff(mask,li) {
+  return showSimplified ? getCoeff(mask,li)-setMin(mask,'current') : getCoeff(mask,li);
+}
+function getDisplayTargetCoeff(mask,li) {
+  return showSimplified ? getTargetCoeff(mask,li)-setMin(mask,'target') : getTargetCoeff(mask,li);
+}
+function computeCurrentConstant() {
+  let t=0; for(let m=1;m<(1<<N);m++) t+=setMin(m,'current'); return t;
+}
+function computeTargetConstant() {
+  let t=0; for(let m=1;m<(1<<N);m++) t+=setMin(m,'target'); return t;
+}
+
+function isMatched(mask,li) {
+  if(!targetActive) return false;
+  return getCoeff(mask,li)===getTargetCoeff(mask,li);
+}
+function checkAllMatched() {
+  if(!targetActive) return false;
+  for(let mask=1;mask<(1<<N);mask++)
+    for(const li of maskLetterIndices(mask))
+      if(getCoeff(mask,li)!==getTargetCoeff(mask,li)) return false;
+  return true;
+}
+function updateCongrats() {
+  const el=document.getElementById('congrats');
+  if(el) el.style.display=checkAllMatched()?'':'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PARSE CONFIG CODE → TARGET
+// ═══════════════════════════════════════════════════════════
+function parseConfigAsTarget(raw) {
+  raw=raw.trim();
+  const parts=raw.split('|');
+  if(parts.length<5) return false;
+  const n=parseInt(parts[0]);
+  if(isNaN(n)||n!==N) return false;
+  const k=parseInt(parts[4]);
+  if(isNaN(k)) return false;
+  const newTarget={};
+  for(let i=5;i<parts.length;i++){
+    const p=parts[i].trim(); if(!p) continue;
+    const m=p.match(/^(\d+):(\d+):(-?\d+)$/);
+    if(!m) return false;
+    const mask=+m[1],li=+m[2],val=+m[3];
+    if(mask<1||mask>=(1<<n)||li<0||li>=n) return false;
+    if(!(mask&(1<<li))) return false;
+    if(!newTarget[mask]) newTarget[mask]={};
+    newTarget[mask][li]=val;
+  }
+  if(k!==0){
+    const X=(1<<N)-1;
+    if(!newTarget[X]) newTarget[X]={};
+    for(let x=0;x<N;x++) newTarget[X][x]=(newTarget[X][x]||0)+k;
+  }
+  targetCoeffs=newTarget;
+  targetActive=true;
+  targetEditMode=false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TARGET UI
+// ═══════════════════════════════════════════════════════════
+function renderTargetArea() {
+  const area=document.getElementById('target-area');
+  if(!targetActive&&!targetEditMode) {
+    area.innerHTML=`<button class="btn-ghost" style="font-size:0.82rem;padding:0.28rem 0.75rem;" onclick="enterTargetMode()">Set Target</button>`;
+  } else if(targetEditMode) {
+    area.innerHTML=
+      `<input id="target-input" type="text" placeholder="Paste Config As Is code… or enter targets manually below"
+              oninput="handleTargetCodePaste(this.value)">` +
+      `<button class="btn-primary" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="finishTargetSetup()">Done</button>` +
+      `<button class="btn-ghost"   style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>`;
+  } else {
+    area.innerHTML=
+      `<span style="font-size:0.79rem;color:#2a7a3a;font-weight:bold;">▶ Target set</span>` +
+      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="enterTargetMode()">Edit</button>` +
+      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>`;
+  }
+}
+
+function enterTargetMode() {
+  targetActive=true; targetEditMode=true;
+  renderTargetArea(); renderHasse(); updateCongrats();
+}
+function finishTargetSetup() {
+  targetEditMode=false;
+  renderTargetArea(); renderHasse(); updateCongrats();
+}
+function clearTarget() {
+  targetCoeffs={}; targetActive=false; targetEditMode=false;
+  renderTargetArea(); renderAll();
+}
+function handleTargetCodePaste(raw) {
+  const inp=document.getElementById('target-input');
+  if(!inp) return;
+  if(!raw.trim()){ inp.classList.remove('parse-ok','parse-err'); return; }
+  const ok=parseConfigAsTarget(raw);
+  inp.classList.toggle('parse-ok', ok);
+  inp.classList.toggle('parse-err',!ok);
+  if(ok){ renderTargetArea(); renderHasse(); updateCongrats(); }
+}
+function handleSimplifiedToggle() {
+  showSimplified=document.getElementById('chk-simplified').checked;
+  renderHasse(); renderChoiceLatex(); renderBMLatex();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CORE BM LOGIC
+// ═══════════════════════════════════════════════════════════
+function recomputeAll() {
+  coeffs={}; touched={};
+  for(const action of actions){
+    if(!action.parsed) continue;
+    const {x,S,T}=action.parsed;
+    for(let mask=1;mask<(1<<N);mask++){
+      if(!(mask&(1<<x))) continue;
+      if((mask&S)!==S)   continue;
+      if((mask&T)!==mask) continue;
+      const diff=mask&~S;
+      const delta=popcount(diff)%2===0?1:-1;
+      if(!coeffs[mask]) coeffs[mask]={};
+      coeffs[mask][x]=(coeffs[mask][x]||0)+delta;
+      if(!touched[mask]) touched[mask]=new Set();
+      touched[mask].add(x);
+    }
+  }
+}
+function doUndoAction(idx){ actions.splice(idx,1); recomputeAll(); renderAll(); }
+
+// ═══════════════════════════════════════════════════════════
+//  PARSE ACTION TEXT
+// ═══════════════════════════════════════════════════════════
+function lettersToMask(str){
+  let mask=0;
+  for(const ch of (str||'').toLowerCase()){
+    const idx=alts.indexOf(ch); if(idx<0) return -1; mask|=(1<<idx);
+  }
+  return mask;
+}
+function parseActionText(text){
+  text=text.trim().replace(/→/g,'->').replace(/\s+/g,' ');
+  const m=text.match(/^([a-zA-Z])\s*:\s*\{?([a-zA-Z]*)\}?\s*->\s*\{?([a-zA-Z]*)\}?\s*$/);
+  if(!m) return null;
+  const x=alts.indexOf(m[1].toLowerCase()); if(x<0) return null;
+  const S=lettersToMask(m[2]), T=lettersToMask(m[3]);
+  if(S<0||T<0||S<1||S>=(1<<N)||T<1||T>=(1<<N)) return null;
+  if(!(S&(1<<x))||(T&S)!==S) return null;
+  return {x,S,T};
+}
+function actionToText(x,S,T){ return `${alts[x]}: {${maskToStr(S)}} → {${maskToStr(T)}}`; }
+
+// ═══════════════════════════════════════════════════════════
+//  SAVE / LOAD CODE
+// ═══════════════════════════════════════════════════════════
+function generateCode(){
+  const parts=[`${N}`];
+  for(const action of actions){
+    if(!action.parsed) continue;
+    const {x,S,T}=action.parsed;
+    parts.push(`${alts[x]}:${S.toString(16)}-${T.toString(16)}`);
+  }
+  return parts.join('|');
+}
+function parseCode(raw){
+  raw=raw.trim();
+  const parts=raw.split('|');
+  const n=parseInt(parts[0],10);
+  if(isNaN(n)||n<2||n>9) return null;
+  const parsed=[];
+  for(let i=1;i<parts.length;i++){
+    const p=parts[i].trim(); if(!p) continue;
+    const m=p.match(/^([a-zA-Z]):([0-9a-fA-F]+)-([0-9a-fA-F]+)$/);
+    if(!m) return null;
+    const x='abcdefghi'.indexOf(m[1].toLowerCase());
+    const S=parseInt(m[2],16), T=parseInt(m[3],16);
+    if(x<0||x>=n||S<1||S>=(1<<n)||T<1||T>=(1<<n)) return null;
+    if(!(S&(1<<x))||(T&S)!==S) return null;
+    parsed.push({x,S,T});
+  }
+  return {n,actions:parsed};
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT / N CHANGE
+// ═══════════════════════════════════════════════════════════
+function initGame(n,loadedActions){
+  N=n; alts='abcdefghi'.slice(0,N).split('');
+  coeffs={}; touched={}; actions=[];
+  selLetter=null; selSource=null;
+  if(loadedActions){
+    for(const a of loadedActions)
+      actions.push({raw:actionToText(a.x,a.S,a.T),parsed:a});
+    recomputeAll();
+  }
+}
+function updateTitle(){
+  document.getElementById('diagram-title').textContent=`alternatives: { ${alts.join(', ')} }`;
+  document.getElementById('n-selector').value=String(N);
+}
+function handleNChange(val){
+  const n=parseInt(val); if(n===N) return;
+  if(actions.some(a=>a.parsed))
+    if(!confirm(`Changing N to ${n} will clear all current actions. Continue?`)){
+      document.getElementById('n-selector').value=String(N); return;
+    }
+  targetCoeffs={}; targetActive=false; targetEditMode=false;
+  initGame(n,null); updateTitle();
+  renderTargetArea(); renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INTERACTION
+// ═══════════════════════════════════════════════════════════
+function handleLetterClick(mask,li,ctrlHeld){
+  if(ctrlHeld){
+    const T=(1<<N)-1; selLetter=null; selSource=null;
+    actions.push({raw:actionToText(li,mask,T),parsed:{x:li,S:mask,T}});
+    recomputeAll(); renderAll(); return;
+  }
+  if(selLetter!==null&&selSource!==null){
+    if(isValidTarget(mask)){ finishSelection(mask); return; }
+    if(selLetter===li&&selSource===mask){ cancelSelection(); return; }
+  }
+  selLetter=li; selSource=mask; renderAll();
+}
+function handleTargetBoxClick(mask){ if(!isValidTarget(mask)) return; finishSelection(mask); }
+function finishSelection(targetMask){
+  const x=selLetter,S=selSource,T=targetMask;
+  selLetter=null; selSource=null;
+  actions.push({raw:actionToText(x,S,T),parsed:{x,S,T}});
+  recomputeAll(); renderAll();
+}
+function cancelSelection(){ selLetter=null; selSource=null; renderAll(); }
+
+function applyHoverPreview(T){
+  if(selLetter===null||selSource===null) return;
+  const x=selLetter,S=selSource;
+  for(let mask=1;mask<(1<<N);mask++){
+    if(!(mask&(1<<x))) continue;
+    if((mask&S)!==S) continue;
+    if((mask&T)!==mask) continue;
+    const diff=popcount(mask&~S), delta=diff%2===0?1:-1;
+    const el=document.getElementById(`cc-${mask}-${x}`); if(!el) continue;
+    const rawNew=getCoeff(mask,x)+delta;
+    const newVal=showSimplified?rawNew-setMin(mask,'current'):rawNew;
+    el.textContent=String(newVal);
+    el.className='coeff-cell coeff-preview';
+    if(newVal>0) el.classList.add('coeff-pos');
+    else if(newVal<0) el.classList.add('coeff-neg');
+    else el.classList.add('coeff-zero');
+  }
+}
+function clearHoverPreview(){
+  document.querySelectorAll('.coeff-cell.coeff-preview').forEach(el=>{
+    const parts=el.id.split('-');
+    const mask=+parts[1],li=+parts[2];
+    const val=getDisplayCoeff(mask,li);
+    el.className='coeff-cell';
+    if(isTouched(mask,li)){
+      el.textContent=String(val);
+      if(val>0) el.classList.add('coeff-pos');
+      else if(val<0) el.classList.add('coeff-neg');
+      else el.classList.add('coeff-zero');
+    } else { el.textContent=''; }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LaTeX / CONFIG GENERATION
+// ═══════════════════════════════════════════════════════════
+function generateLatex(sortMode){
+  sortMode=sortMode||'alpha';
+  const counts=new Map();
+  for(const action of actions){
+    if(!action.parsed) continue;
+    const {x,S,T}=action.parsed;
+    const key=`${x}|${S}|${T}`;
+    counts.set(key,(counts.get(key)||0)+1);
+  }
+  if(counts.size===0) return '';
+  const entries=[...counts.entries()].map(([key,count])=>{
+    const [x,S,T]=key.split('|').map(Number); return {x,S,T,count};
+  });
+  if(sortMode==='coeff'){
+    entries.sort((a,b)=>{
+      if(b.count!==a.count) return b.count-a.count;
+      if(a.x!==b.x) return a.x-b.x;
+      const sa=maskToStr(a.S),sb=maskToStr(b.S); if(sa!==sb) return sa<sb?-1:1;
+      const ta=maskToStr(a.T),tb=maskToStr(b.T); return ta<tb?-1:ta>tb?1:0;
+    });
+  } else {
+    entries.sort((a,b)=>{
+      if(a.x!==b.x) return a.x-b.x;
+      const sa=maskToStr(a.S),sb=maskToStr(b.S); if(sa!==sb) return sa<sb?-1:1;
+      const ta=maskToStr(a.T),tb=maskToStr(b.T); return ta<tb?-1:ta>tb?1:0;
+    });
+  }
+  return entries.map(({x,S,T,count})=>
+    `${count>1?count:''}q_{${maskToStr(T)}}(${alts[x]},\\,${maskToStr(S)})`
+  ).join(' + ');
+}
+
+function generateChoiceLatex(){
+  if(!actions.some(a=>a.parsed)) return '';
+  let constant=0; const pTerms=[];
+  for(let mask=1;mask<(1<<N);mask++){
+    const letters=maskLetterIndices(mask); if(!letters.length) continue;
+    const c={};
+    for(const li of letters) c[li]=getCoeff(mask,li);
+    const minC=Math.min(...letters.map(li=>c[li]));
+    if(minC!==0){ constant+=minC; for(const li of letters) c[li]-=minC; }
+    for(const li of letters) if(c[li]!==0) pTerms.push({x:li,mask,coeff:c[li]});
+  }
+  pTerms.sort((a,b)=>{
+    if(a.x!==b.x) return a.x-b.x;
+    const sa=maskToStr(a.mask),sb=maskToStr(b.mask); return sa<sb?-1:sa>sb?1:0;
+  });
+  if(!pTerms.length&&constant===0) return '0';
+  const allParts=[
+    ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},\\,${maskToStr(mask)})`})),
+    ...(constant!==0?[{val:constant,str:''}]:[])
+  ];
+  if(!allParts.length) return '0';
+  let result='';
+  for(const {val,str} of allParts){
+    const abs=Math.abs(val),pos=val>0;
+    const coeffStr=(abs===1&&str)?'':String(abs);
+    if(result==='') result=(pos?'':'-')+coeffStr+str;
+    else result+=(pos?' + ':' - ')+coeffStr+str;
+  }
+  return result;
+}
+
+function generateConfigCode(){
+  const parts=[N,1,1,1,0];
+  for(let mask=1;mask<(1<<N);mask++)
+    for(const li of maskLetterIndices(mask)){
+      const val=getCoeff(mask,li);
+      if(val!==0) parts.push(`${mask}:${li}:${val}`);
+    }
+  return parts.join('|');
+}
+function generateConfigSimpCode(){
+  let constant=0; const residuals=[];
+  for(let mask=1;mask<(1<<N);mask++){
+    const letters=maskLetterIndices(mask); if(!letters.length) continue;
+    const c={};
+    for(const li of letters) c[li]=getCoeff(mask,li);
+    const minC=Math.min(...letters.map(li=>c[li]));
+    if(minC!==0){ constant+=minC; for(const li of letters) c[li]-=minC; }
+    for(const li of letters) if(c[li]!==0) residuals.push({mask,li,val:c[li]});
+  }
+  const parts=[N,1,1,1,constant];
+  for(const {mask,li,val} of residuals) parts.push(`${mask}:${li}:${val}`);
+  return parts.join('|');
+}
+function copyConfigCode(){
+  const text=generateConfigCode(), btn=document.getElementById('btn-copy-config');
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');document.body.removeChild(ta);
+  });
+  const orig=btn.textContent; btn.textContent='✓'; btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent=orig;btn.classList.remove('copied');},1800);
+}
+function copyConfigSimpCode(){
+  const text=generateConfigSimpCode(), btn=document.getElementById('btn-copy-config-simp');
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');document.body.removeChild(ta);
+  });
+  const orig=btn.textContent; btn.textContent='✓'; btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent=orig;btn.classList.remove('copied');},1800);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDERING
+// ═══════════════════════════════════════════════════════════
+function renderAll(){
+  renderHasse(); renderSidebar(); renderChoiceLatex(); renderBMLatex(); updateCongrats();
+  _updatingCode=true;
+  document.getElementById('save-code').value=generateCode();
+  _updatingCode=false;
+  document.getElementById('save-code').classList.remove('parse-error');
+  document.getElementById('save-code-status').textContent='';
+}
+function renderChoiceLatex(){ document.getElementById('choice-code').value=generateChoiceLatex(); }
+function renderBMLatex(){
+  const sortMode=document.querySelector('input[name="bm-sort"]:checked')?.value||'alpha';
+  const text=generateLatex(sortMode);
+  document.getElementById('latex-code').value=text;
+  if(_bmExpanded) document.getElementById('latex-code-expanded').value=text;
+}
+function toggleExpandBM(){
+  _bmExpanded=!_bmExpanded;
+  const panel=document.getElementById('bm-expanded'), btn=document.getElementById('btn-expand-bm');
+  panel.style.display=_bmExpanded?'':'none';
+  btn.textContent=_bmExpanded?'⤡':'⤢';
+  btn.title=_bmExpanded?'Collapse':'Expand below diagram';
+  if(_bmExpanded){
+    const sortMode=document.querySelector('input[name="bm-sort"]:checked')?.value||'alpha';
+    document.getElementById('latex-code-expanded').value=generateLatex(sortMode);
+  }
+}
+
+function renderHasse(){
+  const hasse=document.getElementById('hasse');
+  hasse.classList.toggle('selecting-mode',selLetter!==null);
+  hasse.innerHTML='';
+
+  // Constant box: shown when target active or simplified on
+  if(targetActive||showSimplified){
+    const currentConst=computeCurrentConstant();
+    const row=document.createElement('div'); row.className='constant-row';
+    const box=document.createElement('div'); box.className='constant-box';
+
+    const curEl=document.createElement('div'); curEl.className='constant-current';
+    curEl.textContent=String(currentConst);
+
+    const lblEl=document.createElement('div'); lblEl.className='constant-label';
+    lblEl.textContent='constant';
+
+    box.appendChild(curEl); box.appendChild(lblEl);
+
+    if(targetActive){
+      const tgtConst=computeTargetConstant();
+      if(currentConst===tgtConst) box.classList.add('const-matched');
+      const tgtEl=document.createElement('div'); tgtEl.className='constant-target';
+      tgtEl.textContent=String(tgtConst);
+      box.appendChild(tgtEl);
+    }
+    row.appendChild(box); hasse.appendChild(row);
+  }
+
+  for(const layer of layeredMasks()){
+    const rowEl=document.createElement('div'); rowEl.className='hasse-layer';
+    for(const mask of layer) rowEl.appendChild(makeBoxEl(mask));
+    hasse.appendChild(rowEl);
+  }
+}
+
+function makeBoxEl(mask){
+  const box=document.createElement('div'); box.className='subset-box';
+  const isSource=(selSource===mask), isTarget=isValidTarget(mask);
+  if(isSource) box.classList.add('is-source');
+  if(isTarget){
+    box.classList.add('is-target');
+    box.addEventListener('click',()=>handleTargetBoxClick(mask));
+    box.addEventListener('mouseenter',()=>applyHoverPreview(mask));
+    box.addEventListener('mouseleave',clearHoverPreview);
+  }
+
+  const cols=document.createElement('div'); cols.className='letter-cols';
+  for(const li of maskLetterIndices(mask)){
+    const col=document.createElement('div'); col.className='letter-col';
+
+    // Coefficient cell
+    const coeff=document.createElement('span');
+    coeff.className='coeff-cell'; coeff.id=`cc-${mask}-${li}`;
+    const val=getDisplayCoeff(mask,li);
+    if(isTouched(mask,li)){
+      coeff.textContent=String(val);
+      if(val>0) coeff.classList.add('coeff-pos');
+      else if(val<0) coeff.classList.add('coeff-neg');
+      else coeff.classList.add('coeff-zero');
+    }
+
+    // Letter cell
+    const letter=document.createElement('span'); letter.className='letter-cell';
+    letter.textContent=alts[li];
+    if(selLetter===li&&selSource===mask) letter.classList.add('is-active');
+    if(targetActive&&isMatched(mask,li)) letter.classList.add('matched');
+    letter.addEventListener('click',e=>{
+      e.stopPropagation(); handleLetterClick(mask,li,e.ctrlKey||e.metaKey);
+    });
+
+    col.appendChild(coeff); col.appendChild(letter);
+
+    // Target cell (only when target mode is on)
+    if(targetActive||targetEditMode){
+      if(targetEditMode){
+        const inp=document.createElement('input');
+        inp.type='number'; inp.className='target-input-cell';
+        const tv=getTargetCoeff(mask,li);
+        inp.value=tv!==0?tv:''; inp.placeholder='0';
+        inp.addEventListener('input',()=>{
+          const v=parseInt(inp.value);
+          setTargetCoeff(mask,li,isNaN(v)?0:v);
+          letter.classList.toggle('matched',targetActive&&isMatched(mask,li));
+          updateCongrats();
+        });
+        col.appendChild(inp);
+      } else {
+        const tv=getDisplayTargetCoeff(mask,li);
+        const tCell=document.createElement('div'); tCell.className='target-cell';
+        if(tv!==0){ tCell.textContent=String(tv); tCell.classList.add('has-target'); }
+        col.appendChild(tCell);
+      }
+    }
+
+    cols.appendChild(col);
+  }
+  box.appendChild(cols);
+  return box;
+}
+
+function renderSidebar(){ renderHint(); renderActionsList(); }
+function renderHint(){
+  const hintBar=document.getElementById('hint-bar');
+  const hintBox=document.getElementById('selection-hint');
+  if(selLetter!==null){
+    hintBar.textContent='Click an orange box to apply the BM action';
+    hintBar.classList.add('selecting');
+    hintBox.style.display='';
+    hintBox.innerHTML=
+      `<strong>${alts[selLetter]}</strong> selected in {${maskToStr(selSource)}}<br>`+
+      `Click any <span style="color:#d07000;font-weight:bold;">highlighted</span> superset `+
+      `to apply q<sub>T</sub>(${alts[selLetter]}, {${maskToStr(selSource)}}).<br><br>`+
+      `<button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;" onclick="cancelSelection()">Cancel</button>`;
+  } else {
+    hintBar.textContent='Click a letter inside any box to begin';
+    hintBar.classList.remove('selecting'); hintBox.style.display='none';
+  }
+}
+
+function renderActionsList(){
+  const list=document.getElementById('actions-list'); list.innerHTML='';
+  if(actions.length===0){
+    const msg=document.createElement('p'); msg.className='no-actions-msg';
+    msg.textContent='No actions yet.'; list.appendChild(msg);
+  }
+  for(let idx=0;idx<actions.length;idx++){
+    const {raw,parsed}=actions[idx];
+    const hasError=!parsed&&raw.trim()!=='';
+    const item=document.createElement('div');
+    item.className='action-item'+(hasError?' has-error':''); item.dataset.idx=idx;
+    const input=document.createElement('input');
+    input.type='text'; input.className='action-input'; input.value=raw;
+    input.addEventListener('input',()=>handleActionEdit(idx,input.value));
+    input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();focusNewActionInput();}});
+    const errIcon=document.createElement('span');
+    errIcon.className='action-error-icon'; errIcon.textContent='⚠'; errIcon.title='Invalid — not applied';
+    const removeBtn=document.createElement('button');
+    removeBtn.className='btn-danger'; removeBtn.textContent='×';
+    removeBtn.title='Remove'; removeBtn.addEventListener('click',()=>doUndoAction(idx));
+    item.appendChild(input); item.appendChild(errIcon); item.appendChild(removeBtn);
+    list.appendChild(item);
+  }
+  const newWrap=document.createElement('div'); newWrap.className='new-action-row';
+  const newInput=document.createElement('input');
+  newInput.type='text'; newInput.id='new-action-input';
+  newInput.className='new-action-input'; newInput.placeholder='e.g.  a: {a} → {abc}';
+  newInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();handleNewActionSubmit(newInput);}});
+  newInput.addEventListener('blur',()=>{if(newInput.value.trim()) handleNewActionSubmit(newInput);});
+  newWrap.appendChild(newInput); list.appendChild(newWrap);
+}
+
+function handleActionEdit(idx,newRaw){
+  actions[idx].raw=newRaw; actions[idx].parsed=parseActionText(newRaw);
+  const item=document.querySelector(`.action-item[data-idx="${idx}"]`);
+  if(item) item.classList.toggle('has-error',!actions[idx].parsed&&newRaw.trim()!=='');
+  recomputeAll(); renderHasse(); renderChoiceLatex(); renderBMLatex(); updateCongrats();
+  _updatingCode=true; document.getElementById('save-code').value=generateCode(); _updatingCode=false;
+}
+function handleNewActionSubmit(inputEl){
+  const raw=inputEl.value.trim(); if(!raw) return;
+  actions.push({raw,parsed:parseActionText(raw)});
+  recomputeAll(); renderAll();
+  const ni=document.getElementById('new-action-input'); if(ni) ni.focus();
+}
+function focusNewActionInput(){
+  const ni=document.getElementById('new-action-input'); if(ni) ni.focus();
+}
+
+function handleSaveCodeInput(){
+  if(_updatingCode) return;
+  const raw=document.getElementById('save-code').value;
+  const statusEl=document.getElementById('save-code-status');
+  const ta=document.getElementById('save-code');
+  if(!raw.trim()){ ta.classList.remove('parse-error'); statusEl.textContent=''; return; }
+  const parsed=parseCode(raw.trim());
+  if(!parsed){ ta.classList.add('parse-error'); statusEl.textContent='⚠ Invalid save code'; }
+  else {
+    ta.classList.remove('parse-error');
+    statusEl.textContent=`✓ Loaded N=${parsed.n}, ${parsed.actions.length} action(s)`;
+    statusEl.style.color='#2a8a5a';
+    initGame(parsed.n,parsed.actions); updateTitle();
+    renderHasse(); renderSidebar(); renderChoiceLatex(); renderBMLatex(); updateCongrats();
+    _updatingCode=true; ta.value=generateCode(); _updatingCode=false;
+  }
+}
+
+function copyPanel(taId,btnId,origLabel,doneLabel){
+  const text=document.getElementById(taId).value, btn=document.getElementById(btnId);
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.getElementById(taId); ta.select(); ta.setSelectionRange(0,99999);
+    document.execCommand('copy');
+  });
+  btn.textContent=doneLabel; btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent=origLabel;btn.classList.remove('copied');},1800);
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') cancelSelection(); });
+document.getElementById('save-code').addEventListener('input',handleSaveCodeInput);
+
+initGame(4,null); updateTitle(); renderTargetArea(); renderAll();
+</script>
+</body>
+</html>
