@@ -87,7 +87,7 @@
     #expr-bar.visible { display: flex; }
     #expr-bar-label { font-size: 0.74rem; color: #557; white-space: nowrap; flex-shrink: 0; padding-top: 0.22rem; }
     #expr-bar-text {
-      flex: 1; min-width: 0; height: 42px; resize: none;
+      flex: 1; min-width: 0; height: 42px; resize: vertical;
       padding: 0.2rem 0.5rem; font-size: 0.79rem; font-family: monospace;
       border: 1.5px solid #c0d0e8; border-radius: 6px;
       background: #fafbff; color: #333; line-height: 1.4;
@@ -308,6 +308,7 @@
       transition: all 0.12s; white-space: nowrap;
     }
     .mode-badge:hover { border-color: #4a7bbd; color: #4a7bbd; }
+    #bm-mode-btn { font-size: 0.78rem; padding: 0.2rem 0.65rem; border-color: #888; }
   </style>
 </head>
 <body>
@@ -324,6 +325,7 @@
         <option value="8">8</option><option value="9">9</option>
       </select>
     </div>
+    <button id="bm-mode-btn" class="mode-badge" onclick="toggleBMMode()" title="Toggle Standard / Interim BM mode">Standard BM</button>
     <h2 id="diagram-title"></h2>
     <div id="right-bar"></div>
   </div>
@@ -382,7 +384,10 @@
 
 <div id="sidebar">
   <div id="actions-panel">
-    <h3>Actions</h3>
+    <div style="display:flex;align-items:center;padding-bottom:0.5rem;border-bottom:1px solid #eee;flex-shrink:0;">
+      <h3 style="border:none;padding:0;">Actions</h3>
+      <button class="btn-ghost" style="margin-left:auto;font-size:0.72rem;padding:0.15rem 0.5rem;color:#c0392b;" onclick="clearAllActions()">Clear All</button>
+    </div>
     <div id="selection-hint" style="display:none" class="selection-hint-box"></div>
     <div id="actions-list"><p class="no-actions-msg">No actions yet.</p></div>
   </div>
@@ -434,6 +439,9 @@ let dispMode = 1;
 
 // bmSortMode: 'alpha' or 'coeff'
 let bmSortMode = 'alpha';
+
+// bmMode: 'standard' (left-click → full set) or 'interim' (left-click → pick dest)
+let bmMode = 'standard';
 
 // Target state
 let targetCoeffs={}, targetK=0, targetActive=false, targetEditMode=false;
@@ -529,7 +537,7 @@ function checkAllMatched(){
   return currentConstant()===targetConstant();
 }
 function updateCongrats(){
-  document.getElementById('congrats').style.display=checkAllMatched()?'':'none';
+  document.getElementById('congrats').style.display=checkAllMatched()?'block':'none';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -743,6 +751,18 @@ function recomputeAll(){
   }
 }
 function doUndoAction(idx){actions.splice(idx,1);recomputeAll();renderAll();}
+function clearAllActions(){
+  if(!actions.length)return;
+  actions=[];recomputeAll();renderAll();
+}
+
+function toggleBMMode(){
+  bmMode=bmMode==='standard'?'interim':'standard';
+  const btn=document.getElementById('bm-mode-btn');
+  if(btn)btn.textContent=bmMode==='standard'?'Standard BM':'Interim BM';
+  // Cancel any pending selection when switching modes
+  selLetter=null;selSource=null;renderAll();
+}
 
 // ═══════════════════════════════════════════════════════════
 //  PARSE ACTION TEXT
@@ -822,27 +842,47 @@ function handleNChange(val){
     }
   targetCoeffs={};targetK=0;targetActive=false;targetEditMode=false;
   initGame(n,null);updateTitle();
-  renderRightBar();renderTargetEditBar();renderAll();
+  renderRightBar();renderExprBar();renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════
 //  INTERACTION
 // ═══════════════════════════════════════════════════════════
 function handleLetterClick(mask,li,ctrlHeld,shiftHeld){
+  const fullSet=(1<<N)-1;
+
   if(shiftHeld){
-    // Remove the most recent Ctrl+click action for this (letter, source set) → full set
-    const fullSet=(1<<N)-1;
-    for(let i=actions.length-1;i>=0;i--){
-      const a=actions[i];
-      if(a.parsed&&a.parsed.x===li&&a.parsed.S===mask&&a.parsed.T===fullSet){
-        actions.splice(i,1);recomputeAll();renderAll();return;
+    if(bmMode==='standard'){
+      // Remove most recent full-set action for this (letter, source)
+      for(let i=actions.length-1;i>=0;i--){
+        const a=actions[i];
+        if(a.parsed&&a.parsed.x===li&&a.parsed.S===mask&&a.parsed.T===fullSet){
+          actions.splice(i,1);recomputeAll();renderAll();return;
+        }
+      }
+    }else{
+      // Interim: remove most recent action for this (letter, source), any destination
+      for(let i=actions.length-1;i>=0;i--){
+        const a=actions[i];
+        if(a.parsed&&a.parsed.x===li&&a.parsed.S===mask){
+          actions.splice(i,1);recomputeAll();renderAll();return;
+        }
       }
     }
     return;
   }
+
+  if(bmMode==='standard'){
+    // Left-click directly applies to full set
+    selLetter=null;selSource=null;
+    actions.push({raw:actionToText(li,mask,fullSet),parsed:{x:li,S:mask,T:fullSet}});
+    recomputeAll();renderAll();return;
+  }
+
+  // Interim BM mode
   if(ctrlHeld){
-    const T=(1<<N)-1;selLetter=null;selSource=null;
-    actions.push({raw:actionToText(li,mask,T),parsed:{x:li,S:mask,T}});
+    selLetter=null;selSource=null;
+    actions.push({raw:actionToText(li,mask,fullSet),parsed:{x:li,S:mask,T:fullSet}});
     recomputeAll();renderAll();return;
   }
   if(selLetter!==null&&selSource!==null){
