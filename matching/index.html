@@ -163,6 +163,8 @@
     .subset-box.is-source { border-color: #4a7bbd; background: #f0f5ff; box-shadow: 0 0 0 3px rgba(74,123,189,0.18); }
     .subset-box.is-target { border-color: #d07000; background: #fff9f0; box-shadow: 0 0 10px rgba(208,112,0,0.25); cursor: pointer; }
     .subset-box.is-target:hover { background: #fff2d8; box-shadow: 0 0 14px rgba(208,112,0,0.40); }
+    .subset-box.box-matched { border-color: #2a7a3a; background: #f0fff0; }
+    .constant-box.box-matched { border-color: #2a7a3a; background: #f0fff0; }
     .letter-cols { display: flex; }
     .letter-col  { display: flex; flex-direction: column; align-items: center; }
     .coeff-cell {
@@ -212,11 +214,21 @@
     #bottom-hint-bar.visible { display: block; }
 
     /* ── Congratulations ── */
+    @keyframes rainbow-cycle {
+      0%   { color: #e74c3c; }
+      16%  { color: #e67e22; }
+      33%  { color: #d4ac0d; }
+      50%  { color: #27ae60; }
+      66%  { color: #2980b9; }
+      83%  { color: #8e44ad; }
+      100% { color: #e74c3c; }
+    }
     #congrats {
-      display: none; text-align: center; padding: 0.55rem 1rem;
-      font-size: 1rem; color: #2a7a3a; font-weight: bold;
-      background: #f0fff0; border-radius: 8px;
-      border: 2px solid #2a7a3a; flex-shrink: 0;
+      display: none; text-align: center; padding: 0.6rem 1rem;
+      font-size: 2.2rem; font-weight: 900; letter-spacing: 0.04em;
+      flex-shrink: 0; font-family: Georgia, serif;
+      animation: rainbow-cycle 2.2s linear infinite;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.10);
     }
 
     /* ── Sidebar ── */
@@ -502,6 +514,12 @@ function targetConstant(){
 
 function isMatched(mask,li){
   return targetActive&&dispCoeff(mask,li)===dispTargetCoeff(mask,li);
+}
+function isBoxMatched(mask){
+  if(!targetActive||targetEditMode)return false;
+  for(const li of maskLetterIndices(mask))
+    if(dispCoeff(mask,li)!==dispTargetCoeff(mask,li))return false;
+  return true;
 }
 function checkAllMatched(){
   if(!targetActive)return false;
@@ -1113,7 +1131,8 @@ function renderHasse(){
         box.appendChild(kInput);
       } else {
         const tgtConst=targetConstant();
-        if(curConst!==tgtConst)lblEl.classList.add('unmatched');
+        if(curConst===tgtConst)box.classList.add('box-matched');
+        else lblEl.classList.add('unmatched');
         const tgtEl=document.createElement('div');tgtEl.className='constant-target';
         tgtEl.textContent=String(tgtConst);
         box.appendChild(tgtEl);
@@ -1134,6 +1153,7 @@ function makeBoxEl(mask){
   const box=document.createElement('div');box.className='subset-box';
   const isSource=(selSource===mask),isTarget=isValidTarget(mask);
   if(isSource)box.classList.add('is-source');
+  if(isBoxMatched(mask))box.classList.add('box-matched');
   if(isTarget){
     box.classList.add('is-target');
     box.addEventListener('click',()=>handleTargetBoxClick(mask));
