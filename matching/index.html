@@ -84,10 +84,27 @@
     #target-paste-input.parse-err { border-color: #c0392b; background: #fff5f5; }
     #target-paste-status { font-size: 0.76rem; }
 
-    /* ── Display mode bar ── */
+    /* ── Expression bar (target choice expression, shown when target locked) ── */
+    #expr-bar {
+      display: none; flex-shrink: 0;
+      background: #f0f5ff; border: 1.5px solid #c0d0e8;
+      border-radius: 8px; padding: 0.38rem 0.75rem;
+      align-items: center; gap: 0.5rem;
+    }
+    #expr-bar.visible { display: flex; }
+    #expr-bar-label { font-size: 0.74rem; color: #557; white-space: nowrap; flex-shrink: 0; }
+    #expr-bar-text {
+      flex: 1; min-width: 0;
+      padding: 0.2rem 0.5rem; font-size: 0.79rem; font-family: monospace;
+      border: 1.5px solid #c0d0e8; border-radius: 6px;
+      background: #fafbff; color: #333;
+    }
+
+    /* ── Display mode bar (bottom-left) ── */
     #disp-mode-bar {
       display: flex; align-items: center; gap: 0.5rem;
       font-size: 0.8rem; color: #666; flex-shrink: 0;
+      margin-top: auto; align-self: flex-start;
     }
     #disp-mode-bar span { color: #999; }
     .disp-btn {
@@ -315,12 +332,12 @@
     <button class="btn-ghost"   style="font-size:0.79rem;padding:0.26rem 0.65rem;" onclick="clearTarget()">Clear</button>
   </div>
 
-  <!-- Display mode bar -->
-  <div id="disp-mode-bar">
-    <span>Display:</span>
-    <button class="disp-btn" id="dbtn-0" onclick="setDispMode(0)">As Is</button>
-    <button class="disp-btn active" id="dbtn-1" onclick="setDispMode(1)">All positive p</button>
-    <button class="disp-btn" id="dbtn-2" onclick="setDispMode(2)">Simplified p</button>
+  <!-- Target expression bar (shown after target is locked) -->
+  <div id="expr-bar">
+    <span id="expr-bar-label">Target:</span>
+    <input id="expr-bar-text" type="text" readonly>
+    <button class="btn-copy-sm" id="btn-expr-copy" onclick="copyExprBar()">Copy</button>
+    <button class="btn-copy-sm green" id="btn-expr-config" onclick="copyExprConfig()">Config</button>
   </div>
 
   <div id="hasse"></div>
@@ -354,6 +371,14 @@
       <button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-left:auto;" onclick="toggleExpandBM()">✕ Close</button>
     </div>
     <textarea id="latex-code-expanded" class="expanded-textarea" readonly></textarea>
+  </div>
+
+  <!-- Display mode bar – bottom-left corner -->
+  <div id="disp-mode-bar">
+    <span>Display:</span>
+    <button class="disp-btn" id="dbtn-0" onclick="setDispMode(0)">As Is</button>
+    <button class="disp-btn active" id="dbtn-1" onclick="setDispMode(1)">All positive p</button>
+    <button class="disp-btn" id="dbtn-2" onclick="setDispMode(2)">Simplified p</button>
   </div>
 </div>
 
@@ -626,7 +651,7 @@ function enterTargetMode(){
 }
 function finishTargetSetup(){
   targetEditMode=false;
-  renderRightBar();renderTargetEditBar();
+  renderRightBar();renderTargetEditBar();renderExprBar();
   renderHasse();updateCongrats();
 }
 function clearTarget(){
@@ -677,7 +702,7 @@ function setDispMode(m){
   if(r)r.checked=true;
   const badge=document.getElementById('choice-mode-badge');
   if(badge)badge.textContent=MODE_LABELS[dispMode]+' ▸';
-  renderHasse();renderChoiceLatex();
+  renderHasse();renderChoiceLatex();renderExprBar();
 }
 
 function cycleDispMode(){setDispMode((dispMode+1)%3);}
@@ -941,11 +966,96 @@ function generateChoiceConfig(){
 }
 
 // ═══════════════════════════════════════════════════════════
+//  TARGET EXPRESSION GENERATION
+// ═══════════════════════════════════════════════════════════
+function generateTargetChoiceLatex(){
+  if(!targetActive)return'';
+  let constant=targetK;const pTerms=[];
+  for(let mask=1;mask<(1<<N);mask++){
+    const letters=maskLetterIndices(mask);if(!letters.length)continue;
+    const factor=factorForSet(mask,'target',dispMode);
+    constant+=factor;
+    for(const li of letters){
+      const residual=getTargetCoeff(mask,li)-factor;
+      if(residual!==0)pTerms.push({x:li,mask,coeff:residual});
+    }
+  }
+  pTerms.sort((a,b)=>{
+    if(a.x!==b.x)return a.x-b.x;
+    const sa=maskToStr(a.mask),sb=maskToStr(b.mask);return sa<sb?-1:sa>sb?1:0;
+  });
+  const allParts=[
+    ...pTerms.map(({x,mask,coeff})=>({val:coeff,str:`p(${alts[x]},\\,${maskToStr(mask)})`})),
+    ...(constant!==0?[{val:constant,str:''}]:[])
+  ];
+  if(!allParts.length)return'0';
+  let result='';
+  for(const{val,str}of allParts){
+    const abs=Math.abs(val),pos=val>0;
+    const coeffStr=(abs===1&&str)?'':String(abs);
+    if(result==='')result=(pos?'':'-')+coeffStr+str;
+    else result+=(pos?' + ':' - ')+coeffStr+str;
+  }
+  return result;
+}
+
+function generateTargetConfig(){
+  if(!targetActive)return'';
+  let k=targetK;const parts=[N,1,1,1];const entries=[];
+  for(let mask=1;mask<(1<<N);mask++){
+    const letters=maskLetterIndices(mask);if(!letters.length)continue;
+    const factor=factorForSet(mask,'target',dispMode);
+    k+=factor;
+    for(const li of letters){
+      const val=getTargetCoeff(mask,li)-factor;
+      if(val!==0)entries.push(`${mask}:${li}:${val}`);
+    }
+  }
+  parts.push(k,...entries);
+  return parts.join('|');
+}
+
+function renderExprBar(){
+  const bar=document.getElementById('expr-bar');
+  if(!bar)return;
+  if(targetActive&&!targetEditMode){
+    bar.classList.add('visible');
+    document.getElementById('expr-bar-text').value=generateTargetChoiceLatex();
+  }else{
+    bar.classList.remove('visible');
+  }
+}
+
+function copyExprBar(){
+  const text=document.getElementById('expr-bar-text').value;
+  const btn=document.getElementById('btn-expr-copy');
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  btn.textContent='✓';btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},1800);
+}
+
+function copyExprConfig(){
+  const text=generateTargetConfig();
+  const btn=document.getElementById('btn-expr-config');
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  btn.textContent='✓';btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent='Config';btn.classList.remove('copied');},1800);
+}
+
+// ═══════════════════════════════════════════════════════════
 //  RENDERING
 // ═══════════════════════════════════════════════════════════
 function renderAll(){
   renderHasse();renderSidebar();renderChoiceLatex();renderBMLatex();updateCongrats();
-  renderRightBar(); // keep topbar in sync with selection state
+  renderRightBar();renderExprBar();
   _updatingCode=true;
   document.getElementById('save-code').value=generateCode();
   _updatingCode=false;
