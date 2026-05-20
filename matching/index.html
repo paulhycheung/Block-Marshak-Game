@@ -52,7 +52,7 @@
     .n-selector-wrap select:focus { outline: none; border-color: #4a7bbd; }
     #diagram-title { font-size: 1rem; color: #555; font-weight: normal; }
 
-    /* ── Right bar (Set Target / hint) ── */
+    /* ── Right bar (Set Target / target badge) ── */
     #right-bar { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
     .btn-set-target {
       background: #4a7bbd; color: white;
@@ -65,14 +65,13 @@
       background: #e8f8ed; border: 1.5px solid #2a7a3a;
       border-radius: 6px; padding: 0.2rem 0.55rem;
     }
-    .hint-selecting { font-size: 0.82rem; color: #c06000; font-weight: bold; }
 
     /* ── Target edit bar (below topbar) ── */
     #target-edit-bar {
       display: none; flex-shrink: 0;
       background: #fffdf5; border: 1.5px solid #f0d090;
       border-radius: 8px; padding: 0.5rem 0.75rem;
-      display: none; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      align-items: center; gap: 0.5rem; flex-wrap: wrap;
     }
     #target-edit-bar.visible { display: flex; }
     #target-paste-input {
@@ -174,7 +173,8 @@
     }
     .letter-cell:hover     { color: #d07000; }
     .letter-cell.is-active { color: #d07000; }
-    .letter-cell.matched   { color: #2a7a3a; font-weight: bold; }
+    /* matched = normal black (no special styling); unmatched = red */
+    .letter-cell.unmatched { color: #c0392b; }
     #hasse.selecting-mode .letter-cell:hover:not(.is-active) { color: #222; }
 
     /* ── Target cells ── */
@@ -191,6 +191,14 @@
       pointer-events: all;
     }
     .target-input-cell:focus { outline: none; border-color: #4a7bbd; background: white; }
+
+    /* ── Bottom hint bar ── */
+    #bottom-hint-bar {
+      display: none; flex-shrink: 0; align-self: flex-end;
+      background: #fff8ec; border: 1px solid #f0d090; border-radius: 8px;
+      padding: 0.45rem 0.75rem; font-size: 0.82rem; color: #7a4800; line-height: 1.5;
+    }
+    #bottom-hint-bar.visible { display: block; }
 
     /* ── Congratulations ── */
     #congrats {
@@ -318,6 +326,9 @@
   <div id="hasse"></div>
   <div id="congrats">Congratulations! All values matched!</div>
 
+  <!-- Bottom hint bar: shows selection state without blocking the topbar Set Target button -->
+  <div id="bottom-hint-bar"></div>
+
   <!-- Expanded Choice panel -->
   <div id="choice-expanded" class="expanded-panel" style="display:none">
     <div class="expanded-panel-header">
@@ -337,8 +348,8 @@
     <div class="expanded-panel-header">
       <strong>BM — expanded</strong>
       <div class="mode-options">
-        <label><input type="radio" name="bm-sort" value="alpha" checked onchange="renderBMLatex()"> Alphabetical</label>
-        <label><input type="radio" name="bm-sort" value="coeff" onchange="renderBMLatex()"> Coefficient first (↓)</label>
+        <label><input type="radio" name="bm-sort" value="alpha" checked onchange="setBMSort(this.value)"> Alphabetical</label>
+        <label><input type="radio" name="bm-sort" value="coeff" onchange="setBMSort(this.value)"> Coeff. Size (↓)</label>
       </div>
       <button class="btn-ghost" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-left:auto;" onclick="toggleExpandBM()">✕ Close</button>
     </div>
@@ -369,6 +380,7 @@
   <div class="sidebar-panel" id="latex-panel">
     <div class="panel-header">
       <h4>BM</h4>
+      <button class="mode-badge" id="bm-sort-badge" onclick="cycleBMSort()" title="Click to toggle sort order">Alpha ▸</button>
       <button class="btn-copy-sm" id="btn-copy-latex" onclick="copyPanel('latex-code','btn-copy-latex','Copy','✓')">Copy</button>
       <button class="btn-expand" id="btn-expand-bm" onclick="toggleExpandBM()">⤢</button>
     </div>
@@ -397,6 +409,9 @@ let _updatingCode=false, _bmExpanded=false, _choiceExpanded=false;
 // dispMode: 0=As Is, 1=All positive p, 2=Simplified p
 let dispMode = 1;
 
+// bmSortMode: 'alpha' or 'coeff'
+let bmSortMode = 'alpha';
+
 // Target state
 let targetCoeffs={}, targetK=0, targetActive=false, targetEditMode=false;
 
@@ -406,6 +421,15 @@ let targetCoeffs={}, targetK=0, targetActive=false, targetEditMode=false;
 function popcount(n){let c=0;while(n){c+=n&1;n>>>=1;}return c;}
 function maskLetterIndices(mask){
   const out=[];for(let i=0;i<N;i++)if(mask&(1<<i))out.push(i);return out;
+}
+// Like maskLetterIndices but sorted by bmSortMode for box display
+function sortedLetterIndicesForBox(mask){
+  const letters=maskLetterIndices(mask);
+  if(bmSortMode==='coeff'){
+    // Sort by dispCoeff descending (largest positive first), then alphabetical
+    letters.sort((a,b)=>dispCoeff(mask,b)-dispCoeff(mask,a)||a-b);
+  }
+  return letters;
 }
 function maskToStr(mask){return maskLetterIndices(mask).map(i=>alts[i]).join('');}
 function layeredMasks(){
@@ -486,9 +510,7 @@ function updateCongrats(){
 function parseInputAsTarget(raw){
   raw=raw.trim();
   if(!raw)return null;
-  // Config code: starts with digit(s) then |
   if(/^\d+\|/.test(raw))return parseConfigCode(raw);
-  // Choice LaTeX: contains p(
   if(/p\s*\(/.test(raw))return parseChoiceLatex(raw);
   return null;
 }
@@ -511,7 +533,6 @@ function parseConfigCode(raw){
     if(!newTarget[mask])newTarget[mask]={};
     newTarget[mask][li]=val;
   }
-  // Apply k to full set (matlabsolver convention)
   if(k!==0){
     const X=(1<<n)-1;
     if(!newTarget[X])newTarget[X]={};
@@ -521,13 +542,10 @@ function parseConfigCode(raw){
 }
 
 function parseChoiceLatex(text){
-  // Normalize: remove \, and extra whitespace
   let s=text.replace(/\\,/g,',').replace(/\\/g,'').replace(/\s+/g,' ').trim();
   const newTarget={};
   let constant=0;
   const consumed=[];
-
-  // Match: [optional sign+coeff] p(letter, letters)
   const re=/([+\-]?\s*\d*)\s*p\s*\(\s*([a-z])\s*,\s*([a-zA-Z]+)\s*\)/gi;
   let m;
   while((m=re.exec(s))!==null){
@@ -550,8 +568,6 @@ function parseChoiceLatex(text){
     consumed.push([m.index,m.index+m[0].length]);
   }
   if(!consumed.length)return null;
-
-  // Extract constant from remainder
   let rem=s;
   [...consumed].reverse().forEach(([a,b])=>{
     rem=rem.slice(0,a)+' '.repeat(b-a)+rem.slice(b);
@@ -583,13 +599,8 @@ function applyParsedTarget(result){
 // ═══════════════════════════════════════════════════════════
 function renderRightBar(){
   const rb=document.getElementById('right-bar');
-  if(selLetter!==null){
-    // Selection mode: show hint + cancel
-    rb.innerHTML=
-      `<span class="hint-selecting">`+
-      `<strong>${alts[selLetter]}</strong> in {${maskToStr(selSource)}} — click a highlighted box</span>`+
-      `<button class="btn-ghost" style="font-size:0.79rem;padding:0.25rem 0.65rem;" onclick="cancelSelection()">Cancel</button>`;
-  } else if(!targetActive&&!targetEditMode){
+  // Always show Set Target / target badge — selection hint is in bottom-hint-bar
+  if(!targetActive&&!targetEditMode){
     rb.innerHTML=`<button class="btn-set-target" onclick="enterTargetMode()">Set Target</button>`;
   } else if(targetEditMode){
     rb.innerHTML=`<span style="font-size:0.79rem;color:#9a6800;">Setting target…</span>`;
@@ -603,15 +614,13 @@ function renderRightBar(){
 
 function renderTargetEditBar(){
   const bar=document.getElementById('target-edit-bar');
-  if(targetEditMode){
-    bar.classList.add('visible');
-    // keep existing input value
-  } else {
-    bar.classList.remove('visible');
-  }
+  if(targetEditMode){bar.classList.add('visible');}
+  else{bar.classList.remove('visible');}
 }
 
 function enterTargetMode(){
+  // Cancel any pending selection before entering target mode
+  selLetter=null;selSource=null;
   targetActive=true;targetEditMode=true;
   const inp=document.getElementById('target-paste-input');
   if(inp){inp.value='';inp.classList.remove('parse-ok','parse-err');}
@@ -664,21 +673,33 @@ const MODE_LABELS=['As Is','All+p','Simp p'];
 
 function setDispMode(m){
   dispMode=+m;
-  // Sync disp-mode-bar buttons
   [0,1,2].forEach(i=>{
     const b=document.getElementById(`dbtn-${i}`);
     if(b)b.classList.toggle('active',i===dispMode);
   });
-  // Sync expanded choice radio
   const r=document.querySelector(`input[name="exp-disp"][value="${m}"]`);
   if(r)r.checked=true;
-  // Update badge
   const badge=document.getElementById('choice-mode-badge');
   if(badge)badge.textContent=MODE_LABELS[dispMode]+' ▸';
   renderHasse();renderChoiceLatex();
 }
 
 function cycleDispMode(){setDispMode((dispMode+1)%3);}
+
+// ═══════════════════════════════════════════════════════════
+//  BM SORT MODE
+// ═══════════════════════════════════════════════════════════
+function setBMSort(mode){
+  bmSortMode=mode;
+  const badge=document.getElementById('bm-sort-badge');
+  if(badge)badge.textContent=(bmSortMode==='alpha'?'Alpha':'Coeff')+' ▸';
+  // Sync expanded radio
+  const r=document.querySelector(`input[name="bm-sort"][value="${mode}"]`);
+  if(r)r.checked=true;
+  renderHasse();renderBMLatex();
+}
+
+function cycleBMSort(){setBMSort(bmSortMode==='alpha'?'coeff':'alpha');}
 
 // ═══════════════════════════════════════════════════════════
 //  BM CORE
@@ -844,8 +865,7 @@ function clearHoverPreview(){
 // ═══════════════════════════════════════════════════════════
 //  LaTeX / CONFIG GENERATION
 // ═══════════════════════════════════════════════════════════
-function generateLatex(sortMode){
-  sortMode=sortMode||'alpha';
+function generateLatex(){
   const counts=new Map();
   for(const action of actions){
     if(!action.parsed)continue;
@@ -857,7 +877,7 @@ function generateLatex(sortMode){
   const entries=[...counts.entries()].map(([key,count])=>{
     const[x,S,T]=key.split('|').map(Number);return{x,S,T,count};
   });
-  if(sortMode==='coeff'){
+  if(bmSortMode==='coeff'){
     entries.sort((a,b)=>{
       if(b.count!==a.count)return b.count-a.count;
       if(a.x!==b.x)return a.x-b.x;
@@ -876,7 +896,6 @@ function generateLatex(sortMode){
   ).join(' + ');
 }
 
-// generateChoiceLatex: uses dispMode for factoring
 function generateChoiceLatex(){
   if(!actions.some(a=>a.parsed))return'';
   let constant=0;const pTerms=[];
@@ -909,9 +928,8 @@ function generateChoiceLatex(){
   return result;
 }
 
-// generateChoiceConfig: config code matching the current display mode
 function generateChoiceConfig(){
-  let k=0;const parts=[N,1,1,1];  // placeholder for k
+  let k=0;const parts=[N,1,1,1];
   const entries=[];
   for(let mask=1;mask<(1<<N);mask++){
     const letters=maskLetterIndices(mask);if(!letters.length)continue;
@@ -931,6 +949,7 @@ function generateChoiceConfig(){
 // ═══════════════════════════════════════════════════════════
 function renderAll(){
   renderHasse();renderSidebar();renderChoiceLatex();renderBMLatex();updateCongrats();
+  renderRightBar(); // keep topbar in sync with selection state
   _updatingCode=true;
   document.getElementById('save-code').value=generateCode();
   _updatingCode=false;
@@ -945,8 +964,7 @@ function renderChoiceLatex(){
 }
 
 function renderBMLatex(){
-  const sortMode=document.querySelector('input[name="bm-sort"]:checked')?.value||'alpha';
-  const text=generateLatex(sortMode);
+  const text=generateLatex();
   document.getElementById('latex-code').value=text;
   if(_bmExpanded)document.getElementById('latex-code-expanded').value=text;
 }
@@ -964,10 +982,7 @@ function toggleExpandBM(){
   document.getElementById('bm-expanded').style.display=_bmExpanded?'':'none';
   const btn=document.getElementById('btn-expand-bm');
   btn.textContent=_bmExpanded?'⤡':'⤢';
-  if(_bmExpanded){
-    const sortMode=document.querySelector('input[name="bm-sort"]:checked')?.value||'alpha';
-    document.getElementById('latex-code-expanded').value=generateLatex(sortMode);
-  }
+  if(_bmExpanded)document.getElementById('latex-code-expanded').value=generateLatex();
 }
 
 function renderHasse(){
@@ -975,7 +990,6 @@ function renderHasse(){
   hasse.classList.toggle('selecting-mode',selLetter!==null);
   hasse.innerHTML='';
 
-  // Constant box: shown when target active or dispMode>0
   const showConst=targetActive||dispMode>0;
   if(showConst){
     const curConst=currentConstant();
@@ -984,15 +998,12 @@ function renderHasse(){
 
     const curEl=document.createElement('div');curEl.className='constant-current';
     curEl.textContent=String(curConst);
-
     const lblEl=document.createElement('div');lblEl.className='constant-label';
     lblEl.textContent='constant';
-
     box.appendChild(curEl);box.appendChild(lblEl);
 
     if(targetActive){
       if(targetEditMode){
-        // Editable constant input
         const kInput=document.createElement('input');
         kInput.type='number';kInput.className='constant-k-input';
         kInput.value=targetK;kInput.title='Target constant (k)';
@@ -1000,10 +1011,6 @@ function renderHasse(){
           const v=parseInt(kInput.value);
           targetK=isNaN(v)?0:v;
           updateCongrats();
-          // update matched state on letters without full re-render
-          document.querySelectorAll('.letter-cell.matched').forEach(el=>{
-            // will be updated properly on next renderHasse
-          });
         });
         box.appendChild(kInput);
       } else {
@@ -1037,10 +1044,10 @@ function makeBoxEl(mask){
   }
 
   const cols=document.createElement('div');cols.className='letter-cols';
-  for(const li of maskLetterIndices(mask)){
+  // Use sorted order (alpha or coeff) for display within each box
+  for(const li of sortedLetterIndicesForBox(mask)){
     const col=document.createElement('div');col.className='letter-col';
 
-    // Coefficient cell
     const coeff=document.createElement('span');
     coeff.className='coeff-cell';coeff.id=`cc-${mask}-${li}`;
     const val=dispCoeff(mask,li);
@@ -1051,18 +1058,19 @@ function makeBoxEl(mask){
       else coeff.classList.add('coeff-zero');
     }
 
-    // Letter cell
     const letter=document.createElement('span');letter.className='letter-cell';
     letter.textContent=alts[li];
     if(selLetter===li&&selSource===mask)letter.classList.add('is-active');
-    if(targetActive&&isMatched(mask,li))letter.classList.add('matched');
+    // Matched = normal black (no class); unmatched when target active = red
+    if(targetActive){
+      if(!isMatched(mask,li))letter.classList.add('unmatched');
+    }
     letter.addEventListener('click',e=>{
       e.stopPropagation();handleLetterClick(mask,li,e.ctrlKey||e.metaKey);
     });
 
     col.appendChild(coeff);col.appendChild(letter);
 
-    // Target cell
     if(targetActive||targetEditMode){
       if(targetEditMode){
         const inp=document.createElement('input');
@@ -1072,7 +1080,10 @@ function makeBoxEl(mask){
         inp.addEventListener('input',()=>{
           const v=parseInt(inp.value);
           setTargetCoeff(mask,li,isNaN(v)?0:v);
-          letter.classList.toggle('matched',targetActive&&isMatched(mask,li));
+          // Refresh unmatched state immediately
+          if(targetActive){
+            letter.classList.toggle('unmatched',!isMatched(mask,li));
+          }
           updateCongrats();
         });
         col.appendChild(inp);
@@ -1090,10 +1101,9 @@ function makeBoxEl(mask){
   return box;
 }
 
-function renderSidebar(){renderHint();renderActionsList();}
+function renderSidebar(){renderHint();renderActionsList();renderBottomHint();}
 
 function renderHint(){
-  // Sidebar hint box
   const hintBox=document.getElementById('selection-hint');
   if(selLetter!==null){
     hintBox.style.display='';
@@ -1103,6 +1113,20 @@ function renderHint(){
       `to apply q<sub>T</sub>(${alts[selLetter]}, {${maskToStr(selSource)}}).`;
   }else{
     hintBox.style.display='none';
+  }
+}
+
+function renderBottomHint(){
+  const bar=document.getElementById('bottom-hint-bar');
+  if(!bar)return;
+  if(selLetter!==null){
+    bar.classList.add('visible');
+    bar.innerHTML=
+      `<strong>${alts[selLetter]}</strong> selected in {${maskToStr(selSource)}} — `+
+      `click any <span style="color:#d07000;font-weight:bold;">highlighted</span> superset `+
+      `to apply q<sub>T</sub>(${alts[selLetter]}, {${maskToStr(selSource)}}).`;
+  }else{
+    bar.classList.remove('visible');
   }
 }
 
@@ -1207,7 +1231,8 @@ document.getElementById('save-code').addEventListener('input',handleSaveCodeInpu
 
 initGame(4,null);
 updateTitle();
-setDispMode(1); // initialize mode badge + buttons
+setDispMode(1);
+setBMSort('alpha');
 renderRightBar();
 renderTargetEditBar();
 renderAll();
