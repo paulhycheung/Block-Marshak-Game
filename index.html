@@ -577,8 +577,9 @@ function parseChoiceLatex(text){
   let s=text.replace(/\\,/g,',').replace(/\\/g,'').replace(/\s+/g,' ').trim();
   const allLetters='abcdefghi';
 
-  // First pass: detect N from all letters appearing in the expression
-  let detectedN=2;
+  // First pass: detect N from all letters appearing in the expression.
+  // Never shrink below current N — only expand if expression uses new letters.
+  let detectedN=N;
   const scanRe=/p\s*\(\s*([a-z])\s*,\s*([a-zA-Z]+)\s*\)/gi;
   let sm;
   while((sm=scanRe.exec(s))!==null){
