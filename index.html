@@ -375,8 +375,8 @@
   <!-- Display mode bar – bottom-left corner -->
   <div id="disp-mode-bar">
     <span>Display:</span>
-    <button class="disp-btn" id="dbtn-0" onclick="setDispMode(0)">As Is</button>
-    <button class="disp-btn active" id="dbtn-1" onclick="setDispMode(1)">All positive p</button>
+    <button class="disp-btn active" id="dbtn-0" onclick="setDispMode(0)">As Is</button>
+    <button class="disp-btn" id="dbtn-1" onclick="setDispMode(1)">All positive p</button>
     <button class="disp-btn" id="dbtn-2" onclick="setDispMode(2)">Simplified p</button>
   </div>
 </div>
@@ -1387,7 +1387,7 @@ document.getElementById('save-code').addEventListener('input',handleSaveCodeInpu
 
 initGame(4,null);
 updateTitle();
-setDispMode(1);
+setDispMode(0);
 setBMSort('alpha');
 renderRightBar();
 renderAll();
