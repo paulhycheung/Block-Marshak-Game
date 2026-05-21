@@ -575,6 +575,21 @@ function parseConfigCode(raw){
 
 function parseChoiceLatex(text){
   let s=text.replace(/\\,/g,',').replace(/\\/g,'').replace(/\s+/g,' ').trim();
+  const allLetters='abcdefghi';
+
+  // First pass: detect N from all letters appearing in the expression
+  let detectedN=2;
+  const scanRe=/p\s*\(\s*([a-z])\s*,\s*([a-zA-Z]+)\s*\)/gi;
+  let sm;
+  while((sm=scanRe.exec(s))!==null){
+    for(const ch of(sm[1]+sm[2]).toLowerCase()){
+      const idx=allLetters.indexOf(ch);
+      if(idx<0)return null;
+      detectedN=Math.max(detectedN,idx+1);
+    }
+  }
+  const detectedAlts=allLetters.slice(0,detectedN).split('');
+
   const newTarget={};
   let constant=0;
   const consumed=[];
@@ -586,11 +601,11 @@ function parseChoiceLatex(text){
     const sStr=m[3].toLowerCase();
     let coeff=cs===''||cs==='+'?1:cs==='-'?-1:parseInt(cs);
     if(isNaN(coeff))return null;
-    const x=alts.indexOf(xChar);
+    const x=detectedAlts.indexOf(xChar);
     if(x<0)return null;
     let mask=0;
     for(const ch of sStr){
-      const idx=alts.indexOf(ch);
+      const idx=detectedAlts.indexOf(ch);
       if(idx<0)return null;
       mask|=(1<<idx);
     }
@@ -609,7 +624,7 @@ function parseChoiceLatex(text){
     const tokens=rem.match(/[+\-]?\d+/g);
     if(tokens)constant=tokens.reduce((s,t)=>s+parseInt(t),0);
   }
-  return{n:N,targetCoeffs:newTarget,targetK:constant};
+  return{n:detectedN,targetCoeffs:newTarget,targetK:constant};
 }
 
 function applyParsedTarget(result){
