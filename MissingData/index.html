@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Missing Data — M_D Matrix</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Georgia', serif;
+      background: #f0ede8;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      display: flex; align-items: center; gap: 1rem;
+      background: white; border-bottom: 2px solid #e4e0d8;
+      padding: 0.55rem 1.2rem; flex-shrink: 0; flex-wrap: wrap;
+    }
+    #back-link {
+      color: #4a7bbd; text-decoration: none; font-size: 0.88rem;
+      white-space: nowrap;
+    }
+    #back-link:hover { text-decoration: underline; }
+    #page-title {
+      font-size: 1rem; color: #444; font-weight: normal;
+      flex: 1; min-width: 0;
+    }
+    .n-selector-wrap {
+      display: flex; align-items: center; gap: 0.35rem;
+      font-size: 0.88rem; color: #555; white-space: nowrap;
+    }
+    .n-selector-wrap select {
+      font-size: 0.88rem; font-family: 'Georgia', serif;
+      border: 1.5px solid #ccc; border-radius: 6px;
+      padding: 0.22rem 0.45rem; background: white; cursor: pointer;
+    }
+    .n-selector-wrap select:focus { outline: none; border-color: #4a7bbd; }
+
+    /* ── Controls bar ── */
+    #controls-bar {
+      display: flex; align-items: center; gap: 1.2rem;
+      background: #f8f6f2; border-bottom: 1.5px solid #e4e0d8;
+      padding: 0.5rem 1.2rem; flex-shrink: 0; flex-wrap: wrap;
+    }
+    .ctrl-group {
+      display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+    }
+    .ctrl-label {
+      font-size: 0.8rem; color: #888; white-space: nowrap;
+    }
+    .ctrl-sep {
+      width: 1px; height: 20px; background: #ddd; flex-shrink: 0;
+    }
+
+    /* ── Buttons ── */
+    button {
+      font-family: 'Georgia', serif;
+      cursor: pointer; border: none; border-radius: 6px;
+      transition: background 0.13s, opacity 0.13s, transform 0.07s;
+    }
+    button:active:not(:disabled) { transform: scale(0.96); }
+    button:disabled { opacity: 0.42; cursor: default; }
+
+    .btn-global {
+      padding: 0.32rem 0.9rem; font-size: 0.83rem;
+      background: #4a7bbd; color: white;
+    }
+    .btn-global:hover:not(:disabled) { background: #3869aa; }
+
+    .btn-letter {
+      padding: 0.2rem 0.45rem; font-size: 0.78rem;
+      background: white; border: 1.5px solid #ccc; color: #444;
+    }
+    .btn-letter:hover:not(:disabled) { border-color: #4a7bbd; color: #4a7bbd; background: #f0f5ff; }
+    .btn-letter.unsel-btn:hover:not(:disabled) { border-color: #c0392b; color: #c0392b; background: #fff5f5; }
+
+    .letter-group {
+      display: flex; align-items: center; gap: 0.15rem;
+    }
+    .letter-group-label {
+      font-size: 0.8rem; color: #666; font-style: italic; margin-right: 0.1rem;
+    }
+
+    /* ── Diagram area ── */
+    #diagram-scroll {
+      flex: 1; overflow: auto;
+      padding: 1rem 1.2rem;
+    }
+    #diagram {
+      display: flex; flex-direction: column; gap: 0.5rem;
+      align-items: flex-start;
+    }
+
+    /* ── Hasse row ── */
+    .hasse-row {
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+    .row-ctrl {
+      display: flex; flex-direction: column; gap: 0.2rem;
+      flex-shrink: 0; align-self: center;
+    }
+    .btn-row {
+      width: 26px; height: 22px; font-size: 0.72rem;
+      background: white; border: 1.5px solid #ccc; color: #666;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px; padding: 0;
+    }
+    .btn-row.sel-btn:hover { border-color: #2a7a3a; color: #2a7a3a; background: #f0fff4; }
+    .btn-row.unsel-btn:hover { border-color: #c0392b; color: #c0392b; background: #fff5f5; }
+
+    .layer-boxes {
+      display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
+    }
+
+    /* ── Box wrapper ── */
+    .box-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+
+    /* ── Box header (select/deselect strip) ── */
+    .box-header {
+      display: flex; gap: 0.25rem; margin-bottom: 2px;
+    }
+    .btn-box {
+      padding: 0.08rem 0.35rem; font-size: 0.68rem;
+      border-radius: 4px; border: 1.5px solid #ccc;
+      background: white; color: #888; line-height: 1;
+    }
+    .btn-box.sel-btn:hover { border-color: #2a7a3a; color: #2a7a3a; background: #f0fff4; }
+    .btn-box.unsel-btn:hover { border-color: #c0392b; color: #c0392b; background: #fff5f5; }
+
+    /* ── Subset box ── */
+    .subset-box {
+      display: inline-flex; flex-direction: row; align-items: center;
+      border: 2px solid #c8c2b8; border-radius: 9px; background: white;
+      padding: 5px 7px; gap: 4px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .subset-box.all-on {
+      border-color: #4a7bbd; background: #f0f5ff;
+    }
+    .subset-box.all-off {
+      background: #fafaf8;
+    }
+
+    /* ── Letter cell ── */
+    .letter-cell {
+      font-size: 1.05rem; font-weight: bold;
+      width: 1.35rem; height: 1.55rem;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px; cursor: pointer; user-select: none;
+      transition: color 0.13s, background 0.13s, opacity 0.13s;
+      color: #222;
+    }
+    .letter-cell.on {
+      color: #222; opacity: 1;
+    }
+    .letter-cell.off {
+      color: #bbb; opacity: 0.5;
+    }
+    .letter-cell:hover { background: rgba(74,123,189,0.12); opacity: 1 !important; color: #4a7bbd !important; }
+
+    /* ── Matrix info bar ── */
+    #matrix-info {
+      padding: 0.35rem 1.2rem;
+      font-size: 0.8rem; color: #888;
+      background: #f8f6f2; border-top: 1px solid #e4e0d8;
+      flex-shrink: 0;
+    }
+    #matrix-info span { color: #555; font-weight: bold; }
+
+    /* ── Bottom bar ── */
+    #bottombar {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: white; border-top: 2px solid #e4e0d8;
+      padding: 0.65rem 1.2rem; flex-shrink: 0; flex-wrap: wrap;
+    }
+    .btn-generate {
+      padding: 0.45rem 1.4rem; font-size: 0.92rem;
+      background: #2a7a3a; color: white; border-radius: 7px;
+    }
+    .btn-generate:hover:not(:disabled) { background: #1f6030; }
+    .btn-copy {
+      padding: 0.45rem 1.2rem; font-size: 0.92rem;
+      background: #4a7bbd; color: white; border-radius: 7px;
+    }
+    .btn-copy:hover:not(:disabled) { background: #3869aa; }
+    .btn-copy.copied { background: #2a7a3a; }
+    #outdated-note {
+      font-size: 0.78rem; color: #b06000;
+      font-style: italic;
+    }
+    #bottombar-info {
+      margin-left: auto; font-size: 0.75rem; color: #aaa;
+    }
+
+    /* ── Row size label ── */
+    .row-size-label {
+      font-size: 0.7rem; color: #aaa; text-align: center; line-height: 1;
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      margin-right: 2px; flex-shrink: 0; align-self: center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <a href="../" id="back-link">← Game</a>
+  <span id="page-title">Missing Data — M<sub>D</sub> Matrix</span>
+  <div class="n-selector-wrap">
+    N:
+    <select id="n-sel" onchange="setN(+this.value)">
+      <option value="2">2</option>
+      <option value="3" selected>3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+    </select>
+  </div>
+</div>
+
+<!-- Controls bar -->
+<div id="controls-bar">
+  <div class="ctrl-group">
+    <button class="btn-global" onclick="setAll(true)">Select All</button>
+    <button class="btn-global" style="background:#888;" onclick="setAll(false)">Unselect All</button>
+  </div>
+  <div class="ctrl-sep"></div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">By letter:</span>
+    <div id="letter-btns-wrap" class="ctrl-group"></div>
+  </div>
+</div>
+
+<!-- Diagram -->
+<div id="diagram-scroll">
+  <div id="diagram"></div>
+</div>
+
+<!-- Matrix info -->
+<div id="matrix-info">
+  <span id="info-d">D: 0</span> BM terms selected &nbsp;|&nbsp;
+  Matrix: <span id="info-rows">–</span> rows × <span id="info-cols">–</span> cols
+  &nbsp;(<span id="info-rd">0</span> R<sub>D</sub> rows + <span id="info-n">–</span> N rows)
+</div>
+
+<!-- Bottom bar -->
+<div id="bottombar">
+  <button class="btn-generate" id="btn-gen" onclick="generate()">Generate M<sub>D</sub></button>
+  <button class="btn-copy" id="btn-copy" disabled onclick="copyCode()">Copy</button>
+  <span id="outdated-note" style="display:none;">(selection changed — regenerate)</span>
+  <span id="bottombar-info">
+    © <a href="https://paulcheung.net" target="_blank" style="color:#aaa;text-decoration:none;"
+      onmouseover="this.style.color='#4a7bbd'" onmouseout="this.style.color='#aaa'">Paul H.Y. Cheung</a>
+  </span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let N = 3;
+let alts = [];
+let selected = new Set(); // "mask:li"
+let generatedCode = null;
+let generatedSnapshot = null; // Set snapshot at generation time
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════
+function popcount(n) { let c = 0; while (n) { c += n & 1; n >>>= 1; } return c; }
+
+function maskToStr(mask) {
+  return alts.filter((_, i) => mask & (1 << i)).join('');
+}
+
+function maskLetterIndices(mask) {
+  const out = [];
+  for (let i = 0; i < N; i++) if (mask & (1 << i)) out.push(i);
+  return out;
+}
+
+function key(mask, li) { return `${mask}:${li}`; }
+
+// All BM terms (x,S) in canonical order: by mask (ascending), then by li within mask
+function allBMTerms() {
+  const terms = [];
+  for (let mask = 1; mask < (1 << N); mask++) {
+    for (let li = 0; li < N; li++) {
+      if (mask & (1 << li)) terms.push({ mask, li });
+    }
+  }
+  return terms;
+}
+
+// Layers: size N at top → size 1 at bottom
+function layeredMasks() {
+  const layers = [];
+  for (let size = N; size >= 1; size--) {
+    const row = [];
+    for (let m = 1; m < (1 << N); m++) if (popcount(m) === size) row.push(m);
+    row.sort((a, b) => {
+      const ia = maskLetterIndices(a), ib = maskLetterIndices(b);
+      for (let i = 0; i < Math.min(ia.length, ib.length); i++)
+        if (ia[i] !== ib[i]) return ia[i] - ib[i];
+      return 0;
+    });
+    layers.push({ size, masks: row });
+  }
+  return layers;
+}
+
+function setsEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const v of a) if (!b.has(v)) return false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SELECTION HELPERS
+// ═══════════════════════════════════════════════════════════
+function setAll(on) {
+  for (let mask = 1; mask < (1 << N); mask++)
+    for (let li = 0; li < N; li++)
+      if (mask & (1 << li)) {
+        if (on) selected.add(key(mask, li));
+        else selected.delete(key(mask, li));
+      }
+  renderDiagram();
+  onSelectionChange();
+}
+
+function setLetter(li, on) {
+  for (let mask = 1; mask < (1 << N); mask++)
+    if (mask & (1 << li)) {
+      if (on) selected.add(key(mask, li));
+      else selected.delete(key(mask, li));
+    }
+  renderDiagram();
+  onSelectionChange();
+}
+
+function setRow(size, on) {
+  for (let mask = 1; mask < (1 << N); mask++)
+    if (popcount(mask) === size)
+      for (let li = 0; li < N; li++)
+        if (mask & (1 << li)) {
+          if (on) selected.add(key(mask, li));
+          else selected.delete(key(mask, li));
+        }
+  renderDiagram();
+  onSelectionChange();
+}
+
+function setBox(mask, on) {
+  for (let li = 0; li < N; li++)
+    if (mask & (1 << li)) {
+      if (on) selected.add(key(mask, li));
+      else selected.delete(key(mask, li));
+    }
+  renderDiagram();
+  onSelectionChange();
+}
+
+function toggleLetter(mask, li) {
+  const k = key(mask, li);
+  if (selected.has(k)) selected.delete(k);
+  else selected.add(k);
+  // Update just this letter cell for speed
+  const el = document.getElementById(`lc-${mask}-${li}`);
+  if (el) {
+    el.classList.toggle('on', selected.has(k));
+    el.classList.toggle('off', !selected.has(k));
+  }
+  // Update box class
+  const boxEl = document.getElementById(`box-${mask}`);
+  if (boxEl) updateBoxClass(boxEl, mask);
+  updateMatrixInfo();
+  onSelectionChange();
+}
+
+function updateBoxClass(boxEl, mask) {
+  const letters = maskLetterIndices(mask);
+  const onCount = letters.filter(li => selected.has(key(mask, li))).length;
+  boxEl.classList.toggle('all-on', onCount === letters.length);
+  boxEl.classList.toggle('all-off', onCount === 0);
+}
+
+function onSelectionChange() {
+  updateMatrixInfo();
+  if (generatedSnapshot !== null) {
+    const changed = !setsEqual(selected, generatedSnapshot);
+    document.getElementById('outdated-note').style.display = changed ? '' : 'none';
+    if (changed) document.getElementById('btn-copy').disabled = true;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MATRIX GENERATION
+// ═══════════════════════════════════════════════════════════
+function buildMD() {
+  const terms = allBMTerms();
+  const ncols = terms.length;
+
+  // D terms in canonical column order (same as terms, filtered by selected)
+  const dTerms = terms.filter(t => selected.has(key(t.mask, t.li)));
+
+  const rows = [];
+
+  // R_D block: one row per (x,S) in D
+  for (const { mask: S, li: x } of dTerms) {
+    const row = new Array(ncols).fill(0);
+    for (let j = 0; j < ncols; j++) {
+      const { mask: T, li: xp } = terms[j];
+      // 1 if x'=x and T ⊇ S
+      if (xp === x && (T & S) === S) row[j] = 1;
+    }
+    rows.push({ row, label: `rho(${alts[x]},{${maskToStr(S)}})`, block: 'RD' });
+  }
+
+  // N block: one row per non-empty S ⊆ X
+  for (let S = 1; S < (1 << N); S++) {
+    const row = new Array(ncols).fill(0);
+    for (let j = 0; j < ncols; j++) {
+      const { mask: T, li: xp } = terms[j];
+      // 1 if x' ∈ S and T ⊇ S
+      if ((S & (1 << xp)) && (T & S) === S) row[j] = 1;
+    }
+    rows.push({ row, label: `S={${maskToStr(S)}}`, block: 'N' });
+  }
+
+  return { rows, terms, dTerms };
+}
+
+function generateMatlabCode() {
+  const { rows, terms, dTerms } = buildMD();
+
+  const nRD = dTerms.length;
+  const nN = (1 << N) - 1;
+
+  // D description
+  const dDesc = dTerms.length === 0
+    ? 'empty'
+    : dTerms.map(({ mask, li }) => `(${alts[li]},{${maskToStr(mask)}})`).join(', ');
+
+  // Column descriptions
+  const colDescs = terms.map(({ mask, li }, j) =>
+    `%   col ${String(j + 1).padStart(3)}: q(${alts[li]},{${maskToStr(mask)}})`
+  );
+
+  // Number formatting (align matrix entries)
+  const colW = 2; // all entries are 0 or 1
+
+  const matLines = rows.map(({ row, label }) =>
+    '  ' + row.join(' ') + '  % ' + label
+  );
+
+  const lines = [
+    `% M_D matrix  |  N = ${N}`,
+    `%`,
+    `% Available data  D = {${dDesc}}`,
+    `%`,
+    `% Columns (${terms.length} BM terms, ordered by S-mask then x within S):`,
+    ...colDescs,
+    `%`,
+    `% Rows 1..${nRD}        : R_D block  (one row per observed (x,S) in D)`,
+    `%   Entry = 1  iff  column is (x,T) with T ⊇ S`,
+    `% Rows ${nRD + 1}..${nRD + nN}  : N block   (one row per non-empty S ⊆ X)`,
+    `%   Entry = 1  iff  column is (x',T) with x' ∈ S and T ⊇ S`,
+    `%`,
+    `% Usage:  [B, C, info] = methodD_bound(MD);`,
+    `%         [B, C, info] = methodD_bound(MD, opts);`,
+    ``,
+    `MD = [`,
+    ...matLines,
+    `];`,
+  ];
+
+  return lines.join('\n');
+}
+
+function generate() {
+  generatedCode = generateMatlabCode();
+  generatedSnapshot = new Set(selected);
+  const copyBtn = document.getElementById('btn-copy');
+  copyBtn.disabled = false;
+  copyBtn.textContent = 'Copy';
+  copyBtn.classList.remove('copied');
+  document.getElementById('outdated-note').style.display = 'none';
+}
+
+function copyCode() {
+  if (!generatedCode) return;
+  const btn = document.getElementById('btn-copy');
+  navigator.clipboard.writeText(generatedCode).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = generatedCode;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  btn.textContent = 'Copied ✓';
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = 'Copy';
+    btn.classList.remove('copied');
+  }, 2000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════════
+function renderLetterBtns() {
+  const wrap = document.getElementById('letter-btns-wrap');
+  wrap.innerHTML = '';
+  for (let li = 0; li < N; li++) {
+    const grp = document.createElement('div');
+    grp.className = 'letter-group';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'letter-group-label';
+    lbl.textContent = alts[li] + ':';
+    grp.appendChild(lbl);
+
+    const selBtn = document.createElement('button');
+    selBtn.className = 'btn-letter';
+    selBtn.textContent = '+';
+    selBtn.title = `Select all (${alts[li]}, S) pairs`;
+    selBtn.addEventListener('click', () => setLetter(li, true));
+    grp.appendChild(selBtn);
+
+    const unselBtn = document.createElement('button');
+    unselBtn.className = 'btn-letter unsel-btn';
+    unselBtn.textContent = '−';
+    unselBtn.title = `Unselect all (${alts[li]}, S) pairs`;
+    unselBtn.addEventListener('click', () => setLetter(li, false));
+    grp.appendChild(unselBtn);
+
+    wrap.appendChild(grp);
+  }
+}
+
+function renderDiagram() {
+  const diagEl = document.getElementById('diagram');
+  diagEl.innerHTML = '';
+
+  for (const { size, masks } of layeredMasks()) {
+    const rowWrap = document.createElement('div');
+    rowWrap.className = 'hasse-row';
+
+    // Row size label
+    const sizeLabel = document.createElement('div');
+    sizeLabel.className = 'row-size-label';
+    sizeLabel.title = `Sets of size ${size}`;
+    sizeLabel.textContent = `|S|=${size}`;
+    rowWrap.appendChild(sizeLabel);
+
+    // Row controls (select/deselect all in this row)
+    const rowCtrl = document.createElement('div');
+    rowCtrl.className = 'row-ctrl';
+
+    const rSelBtn = document.createElement('button');
+    rSelBtn.className = 'btn-row sel-btn';
+    rSelBtn.textContent = '✓';
+    rSelBtn.title = `Select all letters in |S|=${size} sets`;
+    rSelBtn.addEventListener('click', () => setRow(size, true));
+    rowCtrl.appendChild(rSelBtn);
+
+    const rUnselBtn = document.createElement('button');
+    rUnselBtn.className = 'btn-row unsel-btn';
+    rUnselBtn.textContent = '✗';
+    rUnselBtn.title = `Unselect all letters in |S|=${size} sets`;
+    rUnselBtn.addEventListener('click', () => setRow(size, false));
+    rowCtrl.appendChild(rUnselBtn);
+
+    rowWrap.appendChild(rowCtrl);
+
+    // Boxes
+    const layerEl = document.createElement('div');
+    layerEl.className = 'layer-boxes';
+
+    for (const mask of masks) {
+      const boxWrap = document.createElement('div');
+      boxWrap.className = 'box-wrap';
+
+      // Box header: [+ all] [− all] buttons
+      const hdr = document.createElement('div');
+      hdr.className = 'box-header';
+
+      const bSelBtn = document.createElement('button');
+      bSelBtn.className = 'btn-box sel-btn';
+      bSelBtn.textContent = '+ all';
+      bSelBtn.title = `Select all letters in {${maskToStr(mask)}}`;
+      bSelBtn.addEventListener('click', () => setBox(mask, true));
+      hdr.appendChild(bSelBtn);
+
+      const bUnselBtn = document.createElement('button');
+      bUnselBtn.className = 'btn-box unsel-btn';
+      bUnselBtn.textContent = '− all';
+      bUnselBtn.title = `Unselect all letters in {${maskToStr(mask)}}`;
+      bUnselBtn.addEventListener('click', () => setBox(mask, false));
+      hdr.appendChild(bUnselBtn);
+
+      boxWrap.appendChild(hdr);
+
+      // The box itself
+      const boxEl = document.createElement('div');
+      boxEl.className = 'subset-box';
+      boxEl.id = `box-${mask}`;
+
+      const letters = maskLetterIndices(mask);
+      const onCount = letters.filter(li => selected.has(key(mask, li))).length;
+      if (onCount === letters.length) boxEl.classList.add('all-on');
+      else if (onCount === 0) boxEl.classList.add('all-off');
+
+      for (const li of letters) {
+        const isOn = selected.has(key(mask, li));
+        const lc = document.createElement('span');
+        lc.className = 'letter-cell ' + (isOn ? 'on' : 'off');
+        lc.id = `lc-${mask}-${li}`;
+        lc.textContent = alts[li];
+        lc.title = `Toggle (${alts[li]}, {${maskToStr(mask)}}) — ${isOn ? 'ON (in D)' : 'OFF (not in D)'}`;
+        lc.addEventListener('click', () => toggleLetter(mask, li));
+        boxEl.appendChild(lc);
+      }
+
+      boxWrap.appendChild(boxEl);
+      layerEl.appendChild(boxWrap);
+    }
+
+    rowWrap.appendChild(layerEl);
+    diagEl.appendChild(rowWrap);
+  }
+}
+
+function updateMatrixInfo() {
+  const terms = allBMTerms();
+  const ncols = terms.length;
+  const nRD = terms.filter(t => selected.has(key(t.mask, t.li))).length;
+  const nN = (1 << N) - 1;
+  const nRows = nRD + nN;
+
+  document.getElementById('info-d').textContent = `D: ${nRD}/${ncols}`;
+  document.getElementById('info-rows').textContent = String(nRows);
+  document.getElementById('info-cols').textContent = String(ncols);
+  document.getElementById('info-rd').textContent = String(nRD);
+  document.getElementById('info-n').textContent = String(nN);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT / N CHANGE
+// ═══════════════════════════════════════════════════════════
+function setN(n) {
+  N = n;
+  alts = 'abcdefghi'.slice(0, N).split('');
+  selected = new Set();
+  generatedCode = null;
+  generatedSnapshot = null;
+  document.getElementById('btn-copy').disabled = true;
+  document.getElementById('btn-copy').textContent = 'Copy';
+  document.getElementById('btn-copy').classList.remove('copied');
+  document.getElementById('outdated-note').style.display = 'none';
+  renderLetterBtns();
+  renderDiagram();
+  updateMatrixInfo();
+}
+
+// ── boot ──
+setN(3);
+document.getElementById('n-sel').value = '3';
+</script>
+</body>
+</html>
